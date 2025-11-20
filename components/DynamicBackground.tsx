@@ -5,6 +5,7 @@ import { AppState } from '../types';
 interface DynamicBackgroundProps {
   streak: number;
   appState: AppState;
+  isBroken?: boolean;
 }
 
 // Arena Configuration
@@ -51,17 +52,26 @@ const ARENAS = [
   }
 ];
 
-export const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ streak, appState }) => {
+const BROKEN_ARENA = {
+    id: 'broken',
+    floorColor1: '#B71C1C', 
+    floorColor2: '#E57373',
+    bgColorTop: '#EF5350',
+    bgColorBottom: '#3E0000'
+};
+
+export const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ streak, appState, isBroken }) => {
   
   const arena = useMemo(() => {
+    if (isBroken) return BROKEN_ARENA;
     return ARENAS.find(a => streak < a.maxStreak) || ARENAS[ARENAS.length - 1];
-  }, [streak]);
+  }, [streak, isBroken]);
 
   return (
     <div className="fixed inset-0 z-[-10] overflow-hidden">
       {/* 1. Gradient Background (Sky) */}
       <div 
-        className="absolute inset-0 transition-colors duration-1000"
+        className="absolute inset-0 transition-colors duration-1000 ease-in-out"
         style={{
           background: `linear-gradient(to bottom, ${arena.bgColorTop}, ${arena.bgColorBottom})`
         }}

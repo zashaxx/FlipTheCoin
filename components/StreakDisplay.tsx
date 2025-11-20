@@ -27,7 +27,6 @@ const STREAK_TIERS = [
 
 const getTier = (s: number) => {
   if (s <= 0) return { title: "Dormant", icon: "💤", color: "#94a3b8" };
-  // Find the highest tier less than or equal to streak
   const tier = [...STREAK_TIERS].reverse().find(t => s >= t.threshold);
   return tier || STREAK_TIERS[0];
 };
@@ -37,16 +36,16 @@ interface StreakDisplayProps {
   highScore: number;
   currentSide: CoinSide | null;
   lastMultiplier?: number; 
+  activeMultiplier?: number | null;
   appState: AppState;
 }
 
-export const StreakDisplay: React.FC<StreakDisplayProps> = ({ streak, highScore, currentSide, lastMultiplier = 1, appState }) => {
+export const StreakDisplay: React.FC<StreakDisplayProps> = ({ streak, highScore, currentSide, lastMultiplier = 1, activeMultiplier, appState }) => {
   const [displayStreak, setDisplayStreak] = useState(streak);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isBroken, setIsBroken] = useState(false);
   const prevStreakRef = useRef(streak);
 
-  // Intensity Helper: 0 to 1 based on streak, caps at 50
   const intensity = Math.min(streak / 50, 1);
 
   useEffect(() => {
@@ -56,7 +55,6 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({ streak, highScore,
       setIsBroken(false);
       playStreakStepSound(streak);
       
-      // "Count up" effect delay
       const timer = setTimeout(() => {
         setDisplayStreak(streak);
         setIsAnimating(false);
@@ -102,20 +100,7 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({ streak, highScore,
        </svg>
 
        {/* --- CONTAINER --- */}
-       <div className={`relative transition-transform duration-300 flex flex-col items-center ${isAnimating ? 'scale-110' : 'scale-100'} ${isBroken ? 'animate-shake-intense grayscale contrast-125' : ''}`}>
-          
-          {/* Background Glow based on Tier Color + Intensity */}
-          {active && !isBroken && (
-            <div 
-              className="absolute top-0 left-1/2 -translate-x-1/2 blur-3xl rounded-full transition-colors duration-500" 
-              style={{ 
-                backgroundColor: tier.color,
-                width: `${8 + (intensity * 8)}rem`,
-                height: `${8 + (intensity * 8)}rem`,
-                opacity: 0.4 + (intensity * 0.4)
-              }}
-            ></div>
-          )}
+       <div className={`relative transition-transform duration-300 flex flex-col items-center ${isAnimating ? 'scale-105' : 'scale-100'} ${isBroken ? 'animate-shake-intense grayscale contrast-125' : ''}`}>
           
           {/* Dynamic Embers */}
           {active && !isBroken && (
@@ -137,56 +122,73 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({ streak, highScore,
              </div>
           )}
 
-          {/* Main Icon Container */}
-          <div className="relative flex flex-col items-center">
+          {/* TIER ICON */}
+          <div 
+            className={`text-7xl filter drop-shadow-lg transition-all duration-300 relative z-20 mb-[-10px] ${isAnimating ? 'animate-elastic-bounce' : 'animate-bounce-gentle'}`}
+            style={{ 
+               opacity: active ? 1 : 0.3,
+               transformOrigin: 'bottom center',
+               filter: active ? 'url(#heatHaze) drop-shadow(0 10px 10px rgba(0,0,0,0.3))' : 'none'
+            }}
+          >
+             {tier.icon}
+          </div>
+
+          <div className="flex items-center justify-center relative w-full">
             
-            {/* TIER ICON */}
-            <div 
-              className={`text-8xl filter drop-shadow-lg transition-all duration-300 relative z-10 ${isAnimating ? 'animate-elastic-bounce' : 'animate-bounce-gentle'}`}
-              style={{ 
-                 opacity: active ? 1 : 0.3,
-                 transformOrigin: 'bottom center',
-                 filter: active ? 'url(#heatHaze) drop-shadow(0 10px 10px rgba(0,0,0,0.3))' : 'none'
-              }}
-            >
-               {tier.icon}
+            {/* STREAK COUNT BOX */}
+            <div className={`
+                 relative flex flex-col items-center justify-center z-10
+                 min-w-[120px] h-[80px] px-6 rounded-xl
+                 bg-gradient-to-b from-[#3B4F74] to-[#1C2B4B]
+                 border-[4px] shadow-[0_8px_0_rgba(0,0,0,0.4),inset_0_2px_0_rgba(255,255,255,0.2)]
+                 transform transition-all duration-200
+                 ${isAnimating 
+                    ? 'border-[#FFD700] shadow-[0_0_40px_rgba(255,215,0,0.6),0_8px_0_rgba(0,0,0,0.4)] scale-110' 
+                    : 'border-[#2C3E5F]'
+                 }
+              `}>
+                 {/* Gloss */}
+                 <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent rounded-t-lg pointer-events-none"></div>
+
+                 <span 
+                   className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-300 leading-none drop-shadow-sm transition-all duration-300"
+                   style={{ 
+                     fontFamily: '"Lilita One", cursive', 
+                     textShadow: isAnimating ? `0 0 20px ${tier.color}` : '0 2px 0 rgba(0,0,0,0.5)',
+                     transform: isAnimating ? `scale(${1 + intensity * 0.1})` : 'scale(1)'
+                   }}
+                 >
+                   {displayStreak}
+                 </span>
+                 
+                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8AA6C8] mt-[-4px]">
+                    {active ? tier.title : "Streak"}
+                 </span>
             </div>
 
-            {/* BROKEN TEXT OVERLAY - MOVED UP TO NOT BLOCK */}
-            {isBroken && (
-               <div className="absolute -top-12 left-1/2 -translate-x-1/2 rotate-[-5deg] z-50 w-full flex justify-center">
-                  <span className="text-5xl font-black text-red-600 text-stroke-white drop-shadow-[0_5px_0_rgba(0,0,0,0.3)] whitespace-nowrap animate-pop-in">
-                    CRACKED!
-                  </span>
-               </div>
+            {/* POWER UP BADGE (Right Side) */}
+            {activeMultiplier && (
+              <div className="absolute left-[95%] top-1/2 -translate-y-1/2 z-30 animate-pop-in ml-2">
+                  <div className="bg-gradient-to-b from-yellow-400 to-orange-500 border-2 border-white rounded-lg shadow-[0_4px_0_rgba(0,0,0,0.3)] px-2 py-1 transform rotate-6">
+                    <div className="text-xs font-black text-yellow-900 uppercase leading-none">Multi</div>
+                    <div className="text-2xl font-black text-white text-stroke-black drop-shadow-sm leading-none">x{activeMultiplier}</div>
+                  </div>
+              </div>
             )}
 
           </div>
 
-          {/* STREAK COUNT BUBBLE */}
-          <div className={`
-               relative mt-4 flex flex-col items-center justify-center
-               min-w-[80px] px-4 py-1 rounded-2xl border-4 border-white/20
-               bg-gradient-to-b from-white/10 to-black/40 shadow-lg backdrop-blur-md
-               transform transition-all duration-300
-               ${isAnimating ? 'scale-125 border-yellow-400/50' : 'scale-100'}
-               ${streak > 10 ? 'animate-shake-intense' : ''}
-            `}>
-               <span 
-                 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-300 leading-none drop-shadow-sm transition-all duration-300"
-                 style={{ 
-                   fontFamily: '"Lilita One", cursive', 
-                   textShadow: isAnimating ? `0 0 20px ${tier.color}` : '0 4px 0 rgba(0,0,0,0.3)',
-                   transform: isAnimating ? `scale(${1 + intensity * 0.2})` : 'scale(1)'
-                 }}
-               >
-                 {displayStreak}
-               </span>
-               
-               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60 mt-1">
-                  {active ? tier.title : "Streak"}
-               </span>
-            </div>
+          {/* STREAK LOST TEXT */}
+          {isBroken && (
+             <div className="absolute top-full mt-4 left-1/2 -translate-x-1/2 z-50 w-[300px] flex justify-center">
+                <div className="bg-red-600 text-white px-4 py-2 rounded-lg border-2 border-white shadow-lg animate-pop-in transform -rotate-2">
+                    <span className="text-2xl font-black text-stroke-black uppercase tracking-wide whitespace-nowrap">
+                      Streak Lost!
+                    </span>
+                </div>
+             </div>
+          )}
 
        </div>
 

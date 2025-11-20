@@ -55,6 +55,7 @@ export default function App() {
   const [currentMultiplier, setCurrentMultiplier] = useState<number>(1);
   const [activeMultiplier, setActiveMultiplier] = useState<number | null>(null); // For the "Pre-flip" display
   const [isFlash, setIsFlash] = useState(false);
+  const [isStreakBroken, setIsStreakBroken] = useState(false);
   
   // Milestones
   const [milestoneStreak, setMilestoneStreak] = useState<number | null>(null);
@@ -113,6 +114,9 @@ export default function App() {
     if (milestoneStreak) setMilestoneStreak(null);
     
     setIsFlash(false);
+    // Do not reset broken state immediately so animation finishes if exists
+    setIsStreakBroken(false);
+    
     setCurrentMultiplier(1);
     setActiveMultiplier(null); // Reset visualization
     
@@ -129,41 +133,27 @@ export default function App() {
     setAppState(AppState.FLIPPING);
 
     // --- CALCULATE MULTIPLIER (PRE-FLIP) ---
-    // Logic: Appear more on lower score, very rare on high score.
-    // Inverse probability calculation.
     let pendingMultiplier = 1;
 
     if (forceMultiplier !== null) {
        pendingMultiplier = forceMultiplier;
     } else {
-       // Base chance decreases as streak increases
-       // Streak 0-5: 20% chance
-       // Streak 200+: 0.1% chance
-       
-       // Formula: Base (0.25) / (1 + Streak * 0.05)
-       // Streak 0: 25%
-       // Streak 10: 16%
-       // Streak 50: 7%
-       // Streak 200: 2% -> let's make it harsher for high streaks
-       
        let chance = 0.3 / (1 + (streak * 0.1));
        if (streak > 200) chance = 0.001; 
        
        if (Math.random() < chance) {
-          // Multiplier triggered! Now decide which one.
           const tier = Math.random();
-          if (tier > 0.90) pendingMultiplier = 10; // 10% chance of x10
-          else if (tier > 0.70) pendingMultiplier = 4; // 20% chance of x4
-          else pendingMultiplier = 2; // 70% chance of x2
+          if (tier > 0.90) pendingMultiplier = 10; 
+          else if (tier > 0.70) pendingMultiplier = 4; 
+          else pendingMultiplier = 2; 
        }
     }
 
     if (pendingMultiplier > 1) {
-       // Show the multiplier appearing BEFORE the flip finishes
        setTimeout(() => {
           setActiveMultiplier(pendingMultiplier);
           playMultiplierSound();
-       }, 300); // Appear shortly after toss starts
+       }, 300); 
     }
 
     if (navigator.vibrate) navigator.vibrate(10);
@@ -183,11 +173,12 @@ export default function App() {
         const isStreakCheck = streakSide === newResult;
         
         if (isStreakCheck) {
-            // Apply the calculated multiplier
             newStreak = (streak + 1) * pendingMultiplier;
         } else {
-            // Streak broken, reset to 1
-            // If multiplier was active, it's wasted!
+            // Streak broken
+            setIsStreakBroken(true);
+            // Reset visual state after a while
+            setTimeout(() => setIsStreakBroken(false), 2000);
         }
         
         if (pendingMultiplier >= 4 && isStreakCheck) {
@@ -214,7 +205,7 @@ export default function App() {
          setTimeout(() => {
             setMilestoneStreak(newStreak);
             playMilestoneSound();
-         }, 600); // Delayed slightly for effect
+         }, 600); 
       }
 
     }, 1200); 
@@ -223,8 +214,8 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-between py-6 relative overflow-hidden font-sans select-none">
       
-      {/* --- DYNAMIC CLASH ROYALE STYLE BACKGROUND --- */}
-      <DynamicBackground streak={streak} appState={appState} />
+      {/* --- DYNAMIC BACKGROUND --- */}
+      <DynamicBackground streak={streak} appState={appState} isBroken={isStreakBroken} />
 
       {/* Overlays */}
       {activeToast && showAchievements && <AchievementToast title={activeToast.title} icon={activeToast.icon} />}
@@ -258,15 +249,12 @@ export default function App() {
       {isDebugMenuOpen && (
          <div className="absolute top-14 right-4 z-50 w-56 bg-slate-900/95 backdrop-blur-md border border-white/20 rounded-xl p-4 shadow-2xl text-xs">
             <h3 className="text-yellow-400 font-bold mb-3 uppercase tracking-wider">Debug Controls</h3>
-            
             <div className="space-y-2">
                <label className="flex items-center justify-between cursor-pointer hover:bg-white/5 p-1 rounded">
                   <span>Show Achievements</span>
                   <input type="checkbox" checked={showAchievements} onChange={(e) => setShowAchievements(e.target.checked)} />
                </label>
-
                <div className="h-px bg-white/10 my-2"></div>
-
                <label className="flex items-center justify-between cursor-pointer hover:bg-white/5 p-1 rounded">
                   <span>Force Heads</span>
                   <input type="checkbox" checked={forceHeads} onChange={(e) => { setForceHeads(e.target.checked); if(e.target.checked) { setForceTails(false); setForceEdge(false); } }} />
@@ -279,7 +267,6 @@ export default function App() {
                   <span>Force Edge</span>
                   <input type="checkbox" checked={forceEdge} onChange={(e) => { setForceEdge(e.target.checked); if(e.target.checked) { setForceHeads(false); setForceTails(false); } }} />
                </label>
-               
                <div className="pt-2 border-t border-white/10">
                   <p className="mb-1 text-slate-400">Force Multiplier</p>
                   <div className="flex gap-1">
@@ -306,22 +293,19 @@ export default function App() {
       <div className="z-10 flex-grow flex flex-col items-center justify-center w-full mt-4 mb-16">
         
         {/* STREAK DISPLAY */}
-        <div className="mb-4">
-          <StreakDisplay streak={streak} highScore={highScore} currentSide={streakSide} lastMultiplier={currentMultiplier} appState={appState} />
+        <div className="mb-4 w-full flex justify-center">
+          <StreakDisplay 
+             streak={streak} 
+             highScore={highScore} 
+             currentSide={streakSide} 
+             lastMultiplier={currentMultiplier} 
+             activeMultiplier={activeMultiplier}
+             appState={appState} 
+          />
         </div>
 
         <div className="relative z-20 scale-90 sm:scale-100">
            <Coin appState={appState} result={result} onFlip={handleFlip} />
-           
-           {/* MULTIPLIER ALERT (Appears while flipping) */}
-           {activeMultiplier && (
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none">
-                  <div className="animate-multiplier-pop bg-gradient-to-b from-yellow-400 to-yellow-600 border-4 border-white rounded-xl p-4 shadow-[0_0_30px_rgba(255,200,0,0.8)] transform rotate-12">
-                      <span className="block text-xs font-black uppercase text-yellow-900 tracking-widest mb-1">Power Up!</span>
-                      <span className="text-6xl font-black text-white text-stroke-black drop-shadow-lg">x{activeMultiplier}</span>
-                  </div>
-              </div>
-           )}
         </div>
 
         {/* Result Text */}
@@ -352,7 +336,7 @@ export default function App() {
             transition-all duration-100 shadow-game-button mb-8 relative overflow-hidden
             ${appState === AppState.FLIPPING 
               ? 'bg-slate-600 border-b-4 border-slate-800 text-slate-400 cursor-default transform scale-95' 
-              : 'bg-[#FDCB2D] border-b-8 border-[#CA9208] text-[#78350F] hover:brightness-110 active:border-b-0 active:translate-y-2 active:shadow-none'
+              : 'bg-[#FDCB2D] border-b-8 border-[#CA9208] text-[#78350F] hover:brightness-110 active:border-b-0 active:translate-y-2 active:shadow-none animate-pulse-glow'
             }
           `}
         >
@@ -362,18 +346,28 @@ export default function App() {
         </button>
 
         {/* History pills */}
-        <div className="flex gap-2 h-12 items-center">
+        <div className="flex gap-3 h-12 items-center">
           {history.map((side, idx) => (
-            <div key={idx} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold shadow-sm ${side === CoinSide.HEADS ? 'bg-blue-500 border-blue-700 text-white' : 'bg-red-500 border-red-700 text-white'}`}>
-               {side === CoinSide.HEADS ? 'H' : 'T'}
+            <div key={idx} className="flex flex-col items-center gap-1">
+               <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-black shadow-md ${side === CoinSide.HEADS ? 'bg-[#2E72F6] border-[#1A4BA0] text-white' : 'bg-[#E63636] border-[#9E1A1A] text-white'}`}>
+                  {side === CoinSide.HEADS ? 'H' : 'T'}
+               </div>
             </div>
           ))}
+          {history.length === 0 && <div className="w-full text-white/30 text-xs uppercase font-bold tracking-widest">No History</div>}
         </div>
       </div>
       
       <style>{`
         .game-btn-small {
            @apply bg-blue-900/80 p-3 rounded-xl border-b-4 border-blue-800 hover:brightness-110 active:border-b-0 active:translate-y-1 transition-all text-white shadow-lg backdrop-blur-sm;
+        }
+        @keyframes pulseGlow {
+           0%, 100% { box-shadow: 0 6px 0px 0px rgba(0,0,0,0.4), 0 0 0 rgba(253, 203, 45, 0); }
+           50% { box-shadow: 0 6px 0px 0px rgba(0,0,0,0.4), 0 0 20px rgba(253, 203, 45, 0.6); }
+        }
+        .animate-pulse-glow {
+           animation: pulseGlow 2s infinite;
         }
       `}</style>
     </div>
