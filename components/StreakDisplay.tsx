@@ -143,59 +143,65 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({ streak, highScore,
              {tier.icon}
           </div>
 
-          <div className="flex items-center justify-center relative w-full z-10">
+          <div className="flex items-center justify-center relative w-full z-10 gap-6">
             
-            {/* ROTATING GLOW BORDER */}
-            <div className={`absolute inset-[-8px] rounded-2xl opacity-80 blur-md transition-opacity duration-500 ${active ? 'animate-spin-slow opacity-100' : 'opacity-0'}`}
-                 style={{ 
-                    background: active ? `conic-gradient(from 0deg, transparent 0%, ${tier.color} 25%, transparent 50%, ${tier.color} 75%, transparent 100%)` : 'none',
-                    animationDuration: `${Math.max(1, 10 - intensity * 8)}s`
-                 }} 
-            />
+            <div className="relative">
+                {/* ROTATING GLOW BORDER */}
+                <div className={`absolute inset-[-8px] rounded-2xl opacity-80 blur-md transition-opacity duration-500 ${active ? 'animate-spin-slow opacity-100' : 'opacity-0'}`}
+                     style={{ 
+                        background: active ? `conic-gradient(from 0deg, transparent 0%, ${tier.color} 25%, transparent 50%, ${tier.color} 75%, transparent 100%)` : 'none',
+                        animationDuration: `${Math.max(1, 10 - intensity * 8)}s`
+                     }} 
+                />
 
-            {/* STREAK COUNT BOX */}
-            <div className={`
-                 relative flex flex-col items-center justify-center z-10
-                 min-w-[140px] sm:min-w-[160px] h-[80px] sm:h-[100px] px-6 rounded-2xl
-                 bg-[#1C2B4B]
-                 border-[4px]
-                 shadow-[0_15px_30px_rgba(0,0,0,0.6),inset_0_2px_10px_rgba(255,255,255,0.1)]
-                 transform transition-all duration-200
-                 ${isMilestone && !isBroken ? 'animate-pulse-gold' : ''}
-                 ${isAnimating 
-                    ? 'border-white shadow-[0_0_60px_rgba(255,255,255,0.5)]' 
-                    : 'border-slate-700'
-                 }
-              `}
-              style={{
-                borderColor: active ? tier.color : undefined
-              }}
-            >
-                 {/* Gloss */}
-                 <div className="absolute top-0 left-0 right-0 h-[40%] bg-gradient-to-b from-white/20 to-transparent rounded-t-xl pointer-events-none"></div>
+                {/* STREAK COUNT BOX */}
+                <div className={`
+                     relative flex flex-col items-center justify-center z-10
+                     min-w-[140px] sm:min-w-[160px] h-[80px] sm:h-[100px] px-6 rounded-2xl
+                     bg-[#1C2B4B]
+                     border-[4px]
+                     shadow-[0_15px_30px_rgba(0,0,0,0.6),inset_0_2px_10px_rgba(255,255,255,0.1)]
+                     transform transition-all duration-200
+                     ${isMilestone && !isBroken ? 'animate-pulse-gold' : ''}
+                     ${isAnimating 
+                        ? 'border-white shadow-[0_0_60px_rgba(255,255,255,0.5)]' 
+                        : 'border-slate-700'
+                     }
+                  `}
+                  style={{
+                    borderColor: active ? tier.color : undefined
+                  }}
+                >
+                     {/* Gloss */}
+                     <div className="absolute top-0 left-0 right-0 h-[40%] bg-gradient-to-b from-white/20 to-transparent rounded-t-xl pointer-events-none"></div>
 
-                 <span 
-                   className={`text-5xl sm:text-7xl font-black text-white leading-none drop-shadow-lg transition-all duration-300 text-stroke-sm ${isTextPopping ? 'animate-pop-text' : ''}`}
-                   style={{ 
-                     fontFamily: '"Lilita One", cursive', 
-                     textShadow: isAnimating ? `0 0 30px ${tier.color}` : '0 4px 0 rgba(0,0,0,0.5)',
-                     opacity: displayStreak === 0 && !isBroken ? 0.3 : 1
-                   }}
-                 >
-                   {displayStreak}
-                 </span>
-                 
-                 <div className={`mt-1 px-3 py-0.5 rounded-full bg-black/30 backdrop-blur-sm border border-white/10`}>
-                     <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: active ? tier.color : '#64748b' }}>
-                        {active ? tier.title : "Streak"}
+                     <span 
+                       className={`text-5xl sm:text-7xl font-black text-white leading-none drop-shadow-lg transition-all duration-300 text-stroke-sm ${isTextPopping ? 'animate-pop-text' : ''}`}
+                       style={{ 
+                         fontFamily: '"Lilita One", cursive', 
+                         textShadow: isAnimating ? `0 0 30px ${tier.color}` : '0 4px 0 rgba(0,0,0,0.5)',
+                         opacity: displayStreak === 0 && !isBroken ? 0.3 : 1
+                       }}
+                     >
+                       {displayStreak}
                      </span>
-                 </div>
+                     
+                     <div className={`mt-1 px-3 py-0.5 rounded-full bg-black/30 backdrop-blur-sm border border-white/10`}>
+                         <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: active ? tier.color : '#64748b' }}>
+                            {active ? tier.title : "Streak"}
+                         </span>
+                     </div>
+                </div>
             </div>
 
-            {/* POWER UP BADGE */}
+            {/* POWER UP BADGE - Beside streak now */}
             {activeMultiplier && (
-              <div className="absolute left-[100%] top-1/2 -translate-y-1/2 z-30 animate-pop-in ml-4">
-                  <div className="bg-gradient-to-br from-yellow-300 to-yellow-600 border-2 border-white rounded-xl shadow-xl px-3 py-2 transform rotate-12 animate-pulse">
+              <div className="relative z-30 animate-pop-in">
+                  {/* Subtle Flash Overlay Behind */}
+                  <div className="absolute inset-0 -m-4 bg-white/60 blur-xl rounded-full animate-pulse"></div>
+                  
+                  {/* The Badge */}
+                  <div className="bg-gradient-to-br from-yellow-300 to-yellow-600 border-2 border-white rounded-xl shadow-xl px-3 py-2 transform rotate-12 animate-shake-intense relative">
                     <div className="text-[10px] font-black text-yellow-900 uppercase leading-none mb-1">Bonus</div>
                     <div className="text-3xl font-black text-white text-stroke-black drop-shadow-sm leading-none">x{activeMultiplier}</div>
                   </div>

@@ -13,8 +13,8 @@ interface CoinProps {
 
 // --- CONSTANTS ---
 const COIN_SIZE = 220; // px
-const COIN_THICKNESS = 14; 
-const SIDE_SEGMENTS = 60;
+const COIN_THICKNESS = 30; // Increased thickness
+const SIDE_SEGMENTS = 80; // Smoother cylinder for thickness
 
 // SVG ICONS WITH ADVANCED SHADERS
 const CrownIcon = () => (
@@ -22,7 +22,7 @@ const CrownIcon = () => (
     <defs>
       <linearGradient id="crownGradient" x1="0%" y1="0%" x2="100%" y2="100%">
         <stop offset="0%" stopColor="#FFF9C4" /> {/* Light Yellow */}
-        <stop offset="40%" stopColor="#FBC02D" /> {/* Gold */}
+        <stop offset="40%" stopColor="#FFD700" /> {/* Gold */}
         <stop offset="100%" stopColor="#F57F17" /> {/* Dark Orange Gold */}
       </linearGradient>
       <filter id="crownEmboss" x="-20%" y="-20%" width="140%" height="140%">
@@ -39,7 +39,7 @@ const CrownIcon = () => (
     <path 
         d="M20 68 L20 35 L35 50 L50 15 L65 50 L80 35 L80 68 Q50 78 20 68 Z" 
         fill="url(#crownGradient)" 
-        stroke="#F9A825" 
+        stroke="#B8860B" 
         strokeWidth="0.5"
         filter="url(#crownEmboss)"
     />
@@ -56,14 +56,14 @@ const StarIcon = () => (
   <svg viewBox="0 0 100 100" className="w-full h-full" style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.5))' }}>
     <defs>
       <linearGradient id="starGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#FFF9C4" /> 
-        <stop offset="40%" stopColor="#FBC02D" /> 
-        <stop offset="100%" stopColor="#F57F17" /> 
+        <stop offset="0%" stopColor="#F5F5F5" /> {/* White Silver */}
+        <stop offset="40%" stopColor="#C0C0C0" /> {/* Silver */}
+        <stop offset="100%" stopColor="#757575" /> {/* Dark Grey */}
       </linearGradient>
       <filter id="starEmboss" x="-20%" y="-20%" width="140%" height="140%">
          <feGaussianBlur in="SourceAlpha" stdDeviation="1" result="blur"/>
          <feOffset in="blur" dx="1" dy="1" result="offsetBlur"/>
-         <feSpecularLighting in="blur" surfaceScale="3" specularConstant="0.8" specularExponent="25" lightingColor="#FFF" result="specOut">
+         <feSpecularLighting in="blur" surfaceScale="3" specularConstant="1.2" specularExponent="35" lightingColor="#FFF" result="specOut">
             <fePointLight x="-5000" y="-10000" z="10000"/>
          </feSpecularLighting>
          <feComposite in="specOut" in2="SourceAlpha" operator="in" result="specOut"/>
@@ -73,7 +73,7 @@ const StarIcon = () => (
     <path 
         d="M50 8 L65 39 L99 39 L72 60 L82 94 L50 74 L18 94 L28 60 L1 39 L35 39 Z" 
         fill="url(#starGradient)" 
-        stroke="#F9A825" 
+        stroke="#505050" 
         strokeWidth="0.5"
         filter="url(#starEmboss)"
     />
@@ -121,6 +121,15 @@ const TextureOverlay = () => (
     </div>
 );
 
+// --- BORDER DETAIL (LINED EDGES) ---
+const LinedBorder = () => (
+    <div className="absolute inset-0 z-10 rounded-full pointer-events-none">
+         <svg viewBox="0 0 100 100" className="w-full h-full opacity-40">
+            <circle cx="50" cy="50" r="46" fill="none" stroke="#3e2723" strokeWidth="2" strokeDasharray="1 2" />
+         </svg>
+    </div>
+);
+
 export const Coin: React.FC<CoinProps> = ({ appState, result, onFlip, onSpinComplete, isAutoSpin, isStopping }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const coinRef = useRef<HTMLDivElement>(null);
@@ -160,6 +169,9 @@ export const Coin: React.FC<CoinProps> = ({ appState, result, onFlip, onSpinComp
             top: '50%',
             marginLeft: `-${segmentWidth / 2}px`,
             marginTop: `-${COIN_THICKNESS / 2}px`,
+            // Add subtle border to simulate reeding/ridges
+            borderLeft: '1px solid rgba(0,0,0,0.1)',
+            borderRight: '1px solid rgba(255,255,255,0.1)',
             filter: 'brightness(0.9)'
           }}
         />
@@ -308,6 +320,7 @@ export const Coin: React.FC<CoinProps> = ({ appState, result, onFlip, onSpinComp
                 }}
              >
                 <TextureOverlay />
+                <LinedBorder />
                 
                 {/* Inner Recessed Ring for extra bump detail */}
                 <div className="absolute inset-[12px] rounded-full border border-yellow-600/40 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] z-10"></div>
@@ -327,14 +340,15 @@ export const Coin: React.FC<CoinProps> = ({ appState, result, onFlip, onSpinComp
                 style={{ 
                     transform: `rotateY(180deg) translateZ(${COIN_THICKNESS / 2}px)`,
                     ...METAL_FACE_STYLE,
-                    // Slight tint shift for Tails (older gold look)
-                    filter: 'contrast(1.1) sepia(0.2)' 
+                    // Silver tint for Tails
+                    filter: 'contrast(1.1) hue-rotate(-45deg) saturate(0.5)' 
                 }}
              >
                  <TextureOverlay />
+                 <LinedBorder />
 
                  {/* Inner Recessed Ring */}
-                 <div className="absolute inset-[12px] rounded-full border border-yellow-700/40 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] z-10"></div>
+                 <div className="absolute inset-[12px] rounded-full border border-gray-500/40 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] z-10"></div>
 
                  {/* Icon */}
                  <div className="w-[65%] h-[65%] relative z-20 opacity-95">

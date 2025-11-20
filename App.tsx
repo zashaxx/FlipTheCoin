@@ -392,8 +392,11 @@ export default function App() {
            if (forceMultiplier !== null) {
               pendingMultiplier = forceMultiplier;
            } else {
-              let chance = 0.3 / (1 + (streak * 0.1));
-              if (streak > 200) chance = 0.001; 
+              // Frequent at low scores, rare at high
+              let chance = 0.02; 
+              if (streak < 50) chance = 0.20; // 20% chance if score < 50
+              if (streak > 200) chance = 0.001; // 0.1% chance if score > 200
+
               if (Math.random() < chance) {
                  const tier = Math.random();
                  pendingMultiplier = tier > 0.90 ? 10 : (tier > 0.70 ? 4 : 2); 
@@ -459,8 +462,11 @@ export default function App() {
         if (forceMultiplier !== null) {
            pendingMultiplier = forceMultiplier;
         } else {
-           let chance = 0.3 / (1 + (streak * 0.1));
-           if (streak > 200) chance = 0.001; 
+           // Frequent at low scores, rare at high
+           let chance = 0.02; 
+           if (streak < 50) chance = 0.20; // 20% chance if score < 50
+           if (streak > 200) chance = 0.001; // 0.1% chance if score > 200
+
            if (Math.random() < chance) {
               const tier = Math.random();
               pendingMultiplier = tier > 0.90 ? 10 : (tier > 0.70 ? 4 : 2); 
