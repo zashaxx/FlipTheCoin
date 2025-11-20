@@ -8,23 +8,45 @@ interface AchievementToastProps {
 
 export const AchievementToast: React.FC<AchievementToastProps> = ({ title, icon }) => {
   return (
-    <div className="fixed top-20 right-0 z-[100] animate-slide-in-right pointer-events-none pr-4">
-      <div className="relative bg-[#F5F1E8] border-4 border-[#CA9208] rounded-lg shadow-[0_8px_0_rgba(0,0,0,0.2)] w-72 p-4 flex items-center gap-3 overflow-visible">
+    <div className="fixed top-8 right-4 z-[100] animate-slide-in-right pointer-events-none">
+      <div className="relative bg-slate-900/80 backdrop-blur-xl border border-[#FFD700]/50 rounded-2xl shadow-[0_10px_40px_-10px_rgba(253,203,45,0.5)] w-auto min-w-[280px] p-4 flex items-center gap-4 overflow-hidden group">
         
-        {/* Shine Effect */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shine pointer-events-none rounded-lg"></div>
+        {/* Animated Background Shine */}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#FFD700]/10 to-transparent -translate-x-full animate-shine pointer-events-none"></div>
 
-        {/* 3D Trophy Icon that pops out */}
-        <div className="absolute -left-8 w-20 h-20 drop-shadow-lg transform -rotate-12">
-            <svg viewBox="0 0 512 512" className="w-full h-full fill-[#FDCB2D] stroke-[#CA9208] stroke-[15]">
-               <path d="M432,64H389.76a112.1,112.1,0,0,0-16.67-45.68C358.61,1.61,334.29,0,304,0H208c-30.29,0-54.61,1.61-69.09,18.32A112.1,112.1,0,0,0,122.24,64H80A80.09,80.09,0,0,0,0,144c0,38.32,26.72,70.64,62.43,78.14C70.69,272.74,112,310.88,167.27,329.66,182.89,390.34,226,439,288,458.46V480H192a16,16,0,0,0,0,32H320a16,16,0,0,0,0-32H224V458.46c62-19.44,105.11-68.12,120.73-128.8C400,310.88,441.31,272.74,449.57,222.14,485.28,214.64,512,182.32,512,144A80.09,80.09,0,0,0,432,64ZM80,192c-26.47,0-48-21.53-48-48s21.53-48,48-48h45c6.3,74.53,26.15,139.09,53.38,187.64C126.19,272.26,90.45,236.48,80,192Zm224-92.35V351.81c-5.31.42-10.63.81-16,.81a203.21,203.21,0,0,1-16.11-.83V32H304C329.3,32,345.89,48.51,349.55,99.65ZM162.45,99.65C166.11,48.51,182.7,32,208,32h32V283.19c-23.77,1.47-49,1.79-73.62-18.59C161.18,216.78,161.38,156.41,162.45,99.65ZM432,192c-10.45,44.48-46.19,80.26-98.38,91.64,27.23-48.55,47.08-113.11,53.38-187.64h45c26.47,0,48,21.53,48,48S458.47,192,432,192Z" />
-            </svg>
+        {/* Better Trophy Icon */}
+        <div className="relative w-14 h-14 flex-shrink-0">
+             <div className="absolute inset-0 bg-[#FFD700] rounded-full blur-xl opacity-20 animate-pulse"></div>
+             <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg">
+                <defs>
+                    <linearGradient id="trophyGold" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#FFF7CC" />
+                        <stop offset="20%" stopColor="#FFD700" />
+                        <stop offset="50%" stopColor="#FDB931" />
+                        <stop offset="100%" stopColor="#9E7C0C" />
+                    </linearGradient>
+                    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="2" result="blur"/>
+                        <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+                    </filter>
+                </defs>
+                
+                {/* Base */}
+                <path d="M30,85 Q50,95 70,85 L75,90 L25,90 Z" fill="#8B5A2B" />
+                {/* Cup */}
+                <path d="M20,20 Q20,60 50,75 Q80,60 80,20 L20,20 Z" fill="url(#trophyGold)" stroke="#B8860B" strokeWidth="2" />
+                {/* Handles */}
+                <path d="M20,25 C5,25 5,45 20,50" fill="none" stroke="#FFD700" strokeWidth="4" strokeLinecap="round" />
+                <path d="M80,25 C95,25 95,45 80,50" fill="none" stroke="#FFD700" strokeWidth="4" strokeLinecap="round" />
+                {/* Star */}
+                <path d="M50,35 L54,45 L65,45 L56,52 L59,62 L50,55 L41,62 L44,52 L35,45 L46,45 Z" fill="#FFF" opacity="0.8" />
+             </svg>
         </div>
 
-        <div className="flex flex-col flex-1 pl-12">
-          <span className="text-[10px] uppercase font-black tracking-wider text-yellow-600">Quest Complete!</span>
-          <span className="text-lg font-black text-slate-800 font-game leading-none">{title}</span>
-          <span className="text-xs text-slate-600 font-semibold mt-1">{icon} Unlocked!</span>
+        <div className="flex flex-col flex-1 z-10">
+          <span className="text-[10px] uppercase font-black tracking-widest text-[#FFD700] mb-0.5">Achievement Unlocked</span>
+          <span className="text-xl font-black text-white font-sans leading-none tracking-tight">{title}</span>
+          <span className="text-xs text-slate-400 font-medium mt-1">{icon} Reward Claimed</span>
         </div>
       </div>
     </div>

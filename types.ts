@@ -16,7 +16,37 @@ export interface Achievement {
   title: string;
   description: string;
   icon: string;
-  unlocked?: boolean; // Optional in definition, managed in state
+  unlocked?: boolean; 
   secret?: boolean;
   condition?: (streak: number, result: CoinSide, history: CoinSide[], multiplier: number) => boolean;
+}
+
+export interface Friend {
+  id: string;
+  name: string;
+  gamerTag: string;
+  status: 'online' | 'offline' | 'playing';
+  avatar?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  age: number | null;
+  gamerTag: string;
+  avatar: string;
+  highScore: number;
+  isNewUser: boolean;
+  friends: Friend[];
+  email?: string;
+}
+
+export interface LeaderboardEntry {
+  id: string;
+  rank: number;
+  name: string;
+  gamerTag: string;
+  score: number;
+  isCurrentUser: boolean;
+  avatar: string;
 }

@@ -25,80 +25,7 @@ const getContext = () => {
 
 // --- BACKGROUND MUSIC (Mock-Royale Theme) ---
 export const toggleBackgroundMusic = (shouldPlay: boolean) => {
-  if (isMuted && shouldPlay) return;
-
-  const ctx = getContext();
-  
-  if (!shouldPlay) {
-    if (bgMusicNode) {
-      bgMusicNode.stop();
-      bgMusicNode = null;
-    }
-    return;
-  }
-
-  if (bgMusicNode) return; 
-  if (ctx.state === 'suspended' && !isMuted) ctx.resume();
-
-  const tempo = 110; 
-  const spb = 60.0 / tempo; 
-  let isPlaying = true;
-  let nextNoteTime = ctx.currentTime + 0.1;
-  let beatCount = 0;
-
-  const melodySequence = [
-    { n: 0, d: 0.5 }, { n: 4, d: 0.5 }, { n: 7, d: 0.5 }, { n: 0, d: 0.5 }, 
-    { n: 5, d: 0.5 }, { n: 9, d: 0.5 }, { n: 5, d: 0.5 }, { n: 2, d: 0.5 }, 
-    { n: 4, d: 0.5 }, { n: 7, d: 0.5 }, { n: 11, d: 0.5 }, { n: 7, d: 0.5 }, 
-    { n: 0, d: 1.0 }, { n: 12, d: 1.0 }, 
-  ];
-  
-  const root = 60;
-  const getFreq = (offset: number) => 440 * Math.pow(2, (root + offset - 69) / 12);
-
-  const scheduleNote = () => {
-    if (!isPlaying) return;
-    
-    if (!isMuted) {
-       const beatIndex = beatCount % 16;
-       const isDownBeat = beatIndex % 2 === 0;
-
-       if (isDownBeat) {
-         const bassOffset = (beatIndex % 4 === 0) ? -12 : -5; 
-         playBrass(getFreq(bassOffset), nextNoteTime, spb * 0.8, 0.2);
-       }
-
-       const melodyIdx = Math.floor(beatCount / 2) % melodySequence.length;
-       if (beatCount % 2 === 0) { 
-          const noteVal = [0, 4, 7, 9, 7, 4, 2, -5][beatCount % 8];
-          playMarimba(getFreq(noteVal), nextNoteTime, 0.15);
-          
-          if (beatCount % 16 === 14) {
-             playMarimba(getFreq(12), nextNoteTime, 0.1);
-             playMarimba(getFreq(16), nextNoteTime + 0.1, 0.1);
-          }
-       }
-    }
-
-    nextNoteTime += spb / 2; 
-    beatCount++;
-
-    const lookahead = 0.1; 
-    if (nextNoteTime < ctx.currentTime + lookahead) {
-       scheduleNote(); 
-    } else {
-       setTimeout(scheduleNote, (nextNoteTime - ctx.currentTime - lookahead) * 1000);
-    }
-  };
-
-  scheduleNote();
-
-  bgMusicNode = {
-    stop: () => {
-      isPlaying = false;
-      bgMusicNode = null;
-    }
-  };
+  // Logic removed per previous request, kept empty for interface compatibility if needed
 };
 
 // --- INSTRUMENTS ---
@@ -144,36 +71,20 @@ const playBrass = (freq: number, time: number, duration: number, vol: number) =>
   osc.stop(time + duration + 0.1);
 };
 
-const playChoirChord = (rootFreq: number, time: number, duration: number) => {
+const playSparkle = (time: number) => {
   if (!audioCtx || isMuted) return;
-  
-  // Simulate a lush choir with multiple detuned sine/triangle waves
-  const freqs = [rootFreq, rootFreq * 1.25, rootFreq * 1.5]; // Major chord
-  
-  freqs.forEach(f => {
-     const osc = audioCtx!.createOscillator();
-     const gain = audioCtx!.createGain();
-     
-     osc.type = 'triangle';
-     osc.frequency.setValueAtTime(f, time);
-     
-     gain.gain.setValueAtTime(0, time);
-     gain.gain.linearRampToValueAtTime(0.2, time + 0.2); // Slow attack
-     gain.gain.exponentialRampToValueAtTime(0.001, time + duration); // Slow release
-     
-     // Add some vibrato
-     const vibOsc = audioCtx!.createOscillator();
-     const vibGain = audioCtx!.createGain();
-     vibOsc.frequency.value = 5; 
-     vibGain.gain.value = 3;
-     vibOsc.connect(vibGain).connect(osc.frequency);
-     vibOsc.start(time);
-     vibOsc.stop(time + duration);
-
-     osc.connect(gain).connect(audioCtx!.destination);
-     osc.start(time);
-     osc.stop(time + duration);
-  });
+  const count = 10;
+  for(let i=0; i<count; i++) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = 1000 + Math.random() * 2000;
+    gain.gain.setValueAtTime(0.05, time + (i*0.05));
+    gain.gain.exponentialRampToValueAtTime(0.001, time + (i*0.05) + 0.1);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(time + (i*0.05));
+    osc.stop(time + (i*0.05) + 0.1);
+  }
 }
 
 // --- SFX ---
@@ -200,35 +111,6 @@ export const playFlipSound = () => {
       osc.start(t);
       osc.stop(t + 1.2);
   });
-
-  const click = ctx.createOscillator();
-  const cGain = ctx.createGain();
-  click.frequency.setValueAtTime(500, t);
-  click.frequency.exponentialRampToValueAtTime(50, t + 0.05);
-  cGain.gain.setValueAtTime(0.5, t);
-  cGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
-  click.connect(cGain).connect(ctx.destination);
-  click.start(t);
-  click.stop(t + 0.05);
-
-  const bufferSize = ctx.sampleRate * 0.4;
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-  
-  const noise = ctx.createBufferSource();
-  noise.buffer = buffer;
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(200, t);
-  filter.frequency.linearRampToValueAtTime(800, t + 0.1); 
-  
-  const nGain = ctx.createGain();
-  nGain.gain.setValueAtTime(0.15, t);
-  nGain.gain.linearRampToValueAtTime(0, t + 0.3);
-
-  noise.connect(filter).connect(nGain).connect(ctx.destination);
-  noise.start(t);
 };
 
 export const playClickSound = () => {
@@ -261,29 +143,9 @@ export const playStreakStepSound = (streakLevel: number) => {
   
   const pitchMod = Math.min(1 + (streakLevel * 0.05), 2.0);
   
-  // 1. Bell
-  playMarimba(523.25 * pitchMod, t, 0.3);
-  playMarimba(1046.50 * pitchMod, t + 0.05, 0.2);
-
-  // 2. Fire ignition "Whoosh"
-  const bufferSize = ctx.sampleRate * 0.3;
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
-  const noise = ctx.createBufferSource();
-  noise.buffer = buffer;
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(100, t);
-  filter.frequency.exponentialRampToValueAtTime(3000, t + 0.15);
-
-  const nGain = ctx.createGain();
-  nGain.gain.setValueAtTime(0.2, t);
-  nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-  
-  noise.connect(filter).connect(nGain).connect(ctx.destination);
-  noise.start(t);
+  // Bright 'Ding'
+  playMarimba(523.25 * pitchMod, t, 0.3); // C
+  playMarimba(783.99 * pitchMod, t + 0.05, 0.3); // G
 };
 
 // STREAK BREAK SOUND
@@ -292,7 +154,6 @@ export const playStreakBreakSound = () => {
     const ctx = getContext();
     const t = ctx.currentTime;
     
-    // Dissonant "Shatter"
     const osc1 = ctx.createOscillator();
     const osc2 = ctx.createOscillator();
     osc1.type = 'sawtooth';
@@ -322,24 +183,15 @@ export const playRevealSound = (rarity: 'COMMON' | 'RARE' | 'LEGENDARY') => {
   const ctx = getContext();
   const t = ctx.currentTime;
 
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.frequency.setValueAtTime(100, t);
-  osc.frequency.exponentialRampToValueAtTime(30, t + 0.2);
-  gain.gain.setValueAtTime(1.0, t);
-  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-  osc.connect(gain).connect(ctx.destination);
-  osc.start(t);
-  osc.stop(t + 0.4);
-
   if (rarity === 'LEGENDARY' || rarity === 'RARE') {
-      playBrass(261.63, t, 0.5, 0.6);
-      playBrass(392.00, t, 0.5, 0.5);
-      playBrass(523.25, t, 0.5, 0.4);
-      
-      for(let i=0; i<10; i++) {
-        playMarimba(1500 + Math.random()*1000, t + i*0.05, 0.1);
-      }
+      // Major triad up
+      playMarimba(523.25, t, 0.2);
+      playMarimba(659.25, t + 0.1, 0.2);
+      playMarimba(783.99, t + 0.2, 0.2);
+      playMarimba(1046.50, t + 0.3, 0.4);
+      playSparkle(t);
+  } else {
+      playMarimba(523.25, t, 0.2);
   }
 };
 
@@ -348,20 +200,18 @@ export const playMilestoneSound = () => {
   const ctx = getContext();
   const t = ctx.currentTime;
   
-  // Simulate "Legendary Card" reveal style
-  // Strong Brass Hit + Choir
-  playBrass(523.25, t, 2.5, 0.6); // C5
-  playBrass(659.25, t, 2.5, 0.6); // E5
-  playBrass(783.99, t, 2.5, 0.6); // G5
+  // Bright, vibrant victory fanfare
+  // Quick arpeggio up
+  [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98].forEach((f, i) => {
+     playMarimba(f, t + (i * 0.05), 0.3);
+  });
+
+  // Power chords
+  playBrass(523.25, t + 0.3, 1.0, 0.4);
+  playBrass(783.99, t + 0.3, 1.0, 0.4);
+  playBrass(1046.50, t + 0.3, 1.0, 0.4);
   
-  // Ascending arp
-  playMarimba(523.25, t, 0.4);
-  playMarimba(659.25, t+0.1, 0.4);
-  playMarimba(783.99, t+0.2, 0.4);
-  playMarimba(1046.5, t+0.3, 0.6);
-  
-  // Choir pad
-  playChoirChord(261.63, t, 3.0); 
+  playSparkle(t);
 };
 
 export const playMultiplierSound = () => {
@@ -369,17 +219,6 @@ export const playMultiplierSound = () => {
   const ctx = getContext();
   const t = ctx.currentTime;
   
-  // Sharp High Pitch Ding + Power Up
-  playMarimba(1046.50, t, 0.5);
-  playMarimba(2093.00, t + 0.1, 0.5);
-  
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.frequency.setValueAtTime(400, t);
-  osc.frequency.linearRampToValueAtTime(1200, t + 0.3); // Slide up
-  gain.gain.setValueAtTime(0.3, t);
-  gain.gain.linearRampToValueAtTime(0, t + 0.3);
-  
-  osc.connect(gain).connect(ctx.destination);
-  osc.start(t);
+  playMarimba(1046.50, t, 0.3);
+  playMarimba(2093.00, t + 0.1, 0.3);
 };
