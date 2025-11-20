@@ -1,0 +1,235 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cosmic Oracle Coin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Outfit:wght@600;800&display=swap" rel="stylesheet">
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Lilita One"', 'cursive'], 
+              body: ['Outfit', 'sans-serif'],
+            },
+            animation: {
+              'spin-slow': 'spin 10s linear infinite',
+              'spin-ray': 'spin 20s linear infinite',
+              'spin-ray-fast': 'spin 10s linear infinite',
+              'spin-ray-slow': 'spin 60s linear infinite',
+              'toss': 'toss 1.2s cubic-bezier(0.45, 0, 0.55, 1) forwards',
+              'pop-in': 'popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+              'pop-text': 'popText 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+              'elastic-bounce': 'elasticBounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+              'milestone-enter': 'milestoneEnter 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+              'shake-intense': 'shakeIntense 0.2s cubic-bezier(.36,.07,.19,.97) infinite',
+              'flash-screen': 'flashScreen 0.4s ease-out forwards',
+              'slide-in-right': 'slideInRight 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+              'bounce-gentle': 'bounceGentle 3s ease-in-out infinite',
+              'float': 'float 4s ease-in-out infinite',
+              'legendary-pulse': 'legendaryPulse 2s infinite',
+              'confetti-fall': 'confettiFall 3s linear forwards',
+              'text-shimmer': 'textShimmer 2s linear infinite',
+              'shine': 'shine 2s infinite',
+              'ember-rise': 'emberRise 2s linear infinite',
+              'particle-explode': 'particleExplode 1s ease-out forwards',
+              'multiplier-pop': 'multiplierPop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+              'floor-scroll': 'floorScroll 20s linear infinite',
+            },
+            colors: {
+              cr: {
+                blue: '#2E72F6',
+                blueDark: '#1A4BA0',
+                red: '#E63636',
+                redDark: '#9E1A1A',
+                gold: '#FFB016', 
+                goldDark: '#C87A00',
+                wood: '#8B5A2B',
+                purple: '#B628FA',
+                purpleDark: '#7608AA',
+                bg: '#1C2B4B',
+              }
+            },
+            boxShadow: {
+              'game-button': '0 6px 0px 0px rgba(0,0,0,0.4)',
+              'game-card': '0 4px 0px 0px rgba(0,0,0,0.3)',
+              'text-heavy': '0 4px 0 rgba(0,0,0,0.5)',
+              'text-glow': '0 0 10px rgba(255,255,255,0.5)',
+            },
+            backgroundImage: {
+              'checkered': 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)'
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      .perspective-1000 { perspective: 1000px; }
+      .transform-style-3d { transform-style: preserve-3d; }
+      .backface-hidden { backface-visibility: hidden; }
+      
+      /* Prevent scrolling when interacting with coin */
+      .touch-none { touch-action: none; }
+
+      /* 3D Floor Effect */
+      .perspective-floor {
+        perspective: 600px;
+        overflow: hidden;
+      }
+      .floor-plane {
+        transform-style: preserve-3d;
+        transform: rotateX(60deg) scale(2);
+        transform-origin: 50% 80%;
+      }
+
+      @keyframes toss {
+        0% { transform: translateY(0) scale(1); animation-timing-function: ease-out; }
+        50% { transform: translateY(-450px) scale(1.1); animation-timing-function: ease-in; } 
+        100% { transform: translateY(0) scale(1); }
+      }
+
+      @keyframes popIn {
+        0% { transform: scale(0); opacity: 0; }
+        70% { transform: scale(1.3); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+
+      @keyframes popText {
+        0% { transform: scale(0.5); }
+        50% { transform: scale(1.5); }
+        100% { transform: scale(1); }
+      }
+
+      @keyframes elasticBounce {
+        0% { transform: scale(1); }
+        30% { transform: scale(1.4); }
+        50% { transform: scale(0.9); }
+        100% { transform: scale(1); }
+      }
+      
+      @keyframes milestoneEnter {
+        0% { transform: scale(0) rotate(-10deg); opacity: 0; }
+        60% { transform: scale(1.1) rotate(5deg); opacity: 1; }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+      }
+
+      @keyframes shakeIntense {
+        0% { transform: translate(1px, 1px) rotate(0deg); }
+        25% { transform: translate(-2px, -2px) rotate(-1deg); }
+        50% { transform: translate(2px, 2px) rotate(1deg); }
+        75% { transform: translate(-1px, -1px) rotate(0deg); }
+        100% { transform: translate(1px, -2px) rotate(-1deg); }
+      }
+
+      @keyframes flashScreen {
+        0% { background-color: rgba(255, 255, 255, 0.8); opacity: 1; }
+        100% { background-color: transparent; opacity: 0; }
+      }
+
+      @keyframes slideInRight {
+        0% { transform: translateX(120%); opacity: 0; }
+        100% { transform: translateX(0); opacity: 1; }
+      }
+
+      @keyframes bounceGentle {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-15px); }
+      }
+      
+      @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-15px); }
+      }
+
+      @keyframes legendaryPulse {
+        0% { box-shadow: 0 0 0 0 rgba(255, 176, 22, 0.7); }
+        70% { box-shadow: 0 0 0 20px rgba(255, 176, 22, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 176, 22, 0); }
+      }
+
+      @keyframes confettiFall {
+        0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(800px) rotate(720deg); opacity: 0; }
+      }
+      
+      @keyframes textShimmer {
+        0% { background-position: 0% 50%; }
+        100% { background-position: 200% 50%; }
+      }
+      
+      @keyframes shine {
+        0% { transform: translateX(-100%) skewX(-15deg); }
+        100% { transform: translateX(200%) skewX(-15deg); }
+      }
+      
+      @keyframes emberRise {
+        0% { transform: translateY(0) scale(1); opacity: 0.8; }
+        50% { opacity: 1; }
+        100% { transform: translateY(-60px) scale(0); opacity: 0; }
+      }
+      
+      @keyframes particleExplode {
+        0% { transform: translate(0, 0) scale(1); opacity: 1; }
+        100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+      }
+      
+      @keyframes multiplierPop {
+        0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+        50% { transform: scale(1.2) rotate(10deg); opacity: 1; }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+      }
+      
+      @keyframes floorScroll {
+         0% { background-position: 0 0; }
+         100% { background-position: 0 100px; }
+      }
+
+      .text-stroke-black {
+        -webkit-text-stroke: 2px black;
+        paint-order: stroke fill;
+      }
+      .text-stroke-white {
+        -webkit-text-stroke: 2px white;
+        paint-order: stroke fill;
+      }
+      .text-stroke-sm {
+        -webkit-text-stroke: 0.8px black;
+      }
+      .text-stroke-thick {
+        -webkit-text-stroke: 4px black;
+        paint-order: stroke fill;
+      }
+      
+      /* God Rays */
+      .god-rays {
+        background: repeating-conic-gradient(
+          from 0deg,
+          rgba(255, 255, 255, 0.1) 0deg 15deg,
+          transparent 15deg 30deg
+        );
+        mask-image: radial-gradient(circle, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 70%);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
+  }
+}
+</script>
+</head>
+  <body class="bg-[#1C2B4B] text-white overflow-x-hidden font-sans">
+    <div id="root"></div>
+  </body>
+</html>
