@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { CoinSide, AppState } from '../types';
 import { playStreakStepSound, playStreakBreakSound } from '../utils/sound';
 
@@ -37,10 +37,35 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({ streak, highScore,
   const [isBroken, setIsBroken] = useState(false);
   const prevStreakRef = useRef(streak);
 
-  const intensity = Math.min(streak / 50, 1);
+  const intensity = Math.min(streak / 30, 1); // Reaches max visual intensity at streak 30
   const tier = getTier(displayStreak > 0 ? displayStreak : (isBroken ? prevStreakRef.current : 0));
   const active = displayStreak > 0 || isBroken;
   const isMilestone = active && displayStreak > 0 && displayStreak % 5 === 0;
+
+  // --- PARTICLE SYSTEM ---
+  const particles = useMemo(() => {
+    if (displayStreak === 0 && !isBroken) return [];
+    
+    const count = Math.min(15 + Math.floor(displayStreak * 1.5), 60); // Base 15, max 60 particles
+    const spreadBase = 70;
+    const spreadVariable = Math.min(displayStreak * 2, 80);
+
+    return Array.from({ length: count }).map((_, i) => {
+       const angle = Math.random() * Math.PI * 2;
+       // Distribute particles in a cloud around the center, expanding with streak
+       const distance = spreadBase + Math.random() * spreadVariable; 
+       
+       return {
+         id: i,
+         x: Math.cos(angle) * distance,
+         y: Math.sin(angle) * distance,
+         size: 2 + Math.random() * 4 + (intensity * 3), // Particles get bigger
+         duration: 0.5 + Math.random() * 1.5,
+         delay: Math.random() * -2,
+         opacity: 0.3 + Math.random() * 0.7
+       };
+    });
+  }, [displayStreak, isBroken, intensity]);
 
   useEffect(() => {
     if (streak > prevStreakRef.current) {
@@ -76,19 +101,39 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({ streak, highScore,
   }, [streak]);
 
   return (
-    <div className="relative w-full flex flex-col items-center z-40 h-[320px] justify-center pointer-events-none transition-all duration-500">
+    <div className="relative w-full flex flex-col items-center z-40 h-[20vh] min-h-[180px] justify-center pointer-events-none transition-all duration-500">
        
        {/* --- HIGH SCORE BADGE --- */}
-       <div className="absolute top-0 bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-1 text-xs font-bold text-yellow-400 uppercase tracking-widest shadow-lg mb-4 z-10">
+       <div className="absolute top-0 bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-4 py-1 text-[10px] sm:text-xs font-bold text-yellow-400 uppercase tracking-widest shadow-lg mb-4 z-10">
           Best Streak: {highScore}
        </div>
 
        {/* --- CONTAINER --- */}
        <div className={`relative transition-all duration-300 flex flex-col items-center ${isAnimating ? 'scale-110' : (active ? 'scale-105' : 'scale-100')} ${isBroken ? 'animate-shake-intense grayscale' : ''}`}>
           
+          {/* PARTICLES & AURA LAYER (Behind everything) */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-0 h-0 flex items-center justify-center z-0 overflow-visible">
+             {/* Ambient Particles */}
+             {particles.map(p => (
+                <div 
+                  key={p.id} 
+                  className="absolute rounded-full animate-pulse mix-blend-screen"
+                  style={{
+                    transform: `translate(${p.x}px, ${p.y}px)`,
+                    width: p.size, 
+                    height: p.size,
+                    backgroundColor: tier.color,
+                    opacity: p.opacity,
+                    animationDuration: `${p.duration}s`,
+                    boxShadow: `0 0 ${p.size * 2}px ${tier.color}`
+                  }}
+                />
+             ))}
+          </div>
+
           {/* TIER ICON */}
           <div 
-            className={`text-8xl filter drop-shadow-2xl transition-all duration-300 relative z-20 mb-2 ${active ? 'animate-bounce-gentle' : 'opacity-50 grayscale'}`}
+            className={`text-6xl sm:text-8xl filter drop-shadow-2xl transition-all duration-300 relative z-20 mb-2 ${active ? 'animate-bounce-gentle' : 'opacity-50 grayscale'}`}
             style={{ 
                transformOrigin: 'bottom center',
                textShadow: active ? `0 10px 30px ${tier.color}` : 'none',
@@ -98,9 +143,9 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({ streak, highScore,
              {tier.icon}
           </div>
 
-          <div className="flex items-center justify-center relative w-full">
+          <div className="flex items-center justify-center relative w-full z-10">
             
-            {/* ROTATING BORDER */}
+            {/* ROTATING GLOW BORDER */}
             <div className={`absolute inset-[-8px] rounded-2xl opacity-80 blur-md transition-opacity duration-500 ${active ? 'animate-spin-slow opacity-100' : 'opacity-0'}`}
                  style={{ 
                     background: active ? `conic-gradient(from 0deg, transparent 0%, ${tier.color} 25%, transparent 50%, ${tier.color} 75%, transparent 100%)` : 'none',
@@ -111,7 +156,7 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({ streak, highScore,
             {/* STREAK COUNT BOX */}
             <div className={`
                  relative flex flex-col items-center justify-center z-10
-                 min-w-[160px] h-[100px] px-8 rounded-2xl
+                 min-w-[140px] sm:min-w-[160px] h-[80px] sm:h-[100px] px-6 rounded-2xl
                  bg-[#1C2B4B]
                  border-[4px]
                  shadow-[0_15px_30px_rgba(0,0,0,0.6),inset_0_2px_10px_rgba(255,255,255,0.1)]
@@ -130,7 +175,7 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({ streak, highScore,
                  <div className="absolute top-0 left-0 right-0 h-[40%] bg-gradient-to-b from-white/20 to-transparent rounded-t-xl pointer-events-none"></div>
 
                  <span 
-                   className={`text-7xl font-black text-white leading-none drop-shadow-lg transition-all duration-300 text-stroke-sm ${isTextPopping ? 'animate-pop-text' : ''}`}
+                   className={`text-5xl sm:text-7xl font-black text-white leading-none drop-shadow-lg transition-all duration-300 text-stroke-sm ${isTextPopping ? 'animate-pop-text' : ''}`}
                    style={{ 
                      fontFamily: '"Lilita One", cursive', 
                      textShadow: isAnimating ? `0 0 30px ${tier.color}` : '0 4px 0 rgba(0,0,0,0.5)',
@@ -141,7 +186,7 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({ streak, highScore,
                  </span>
                  
                  <div className={`mt-1 px-3 py-0.5 rounded-full bg-black/30 backdrop-blur-sm border border-white/10`}>
-                     <span className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: active ? tier.color : '#64748b' }}>
+                     <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: active ? tier.color : '#64748b' }}>
                         {active ? tier.title : "Streak"}
                      </span>
                  </div>

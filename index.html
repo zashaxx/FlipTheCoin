@@ -39,6 +39,7 @@
               'confetti-fall': 'confettiFall 3s linear forwards',
               'text-shimmer': 'textShimmer 2s linear infinite',
               'shine': 'shine 2s infinite',
+              'sparkle': 'sparkle 2s infinite',
               'ember-rise': 'emberRise 2s linear infinite',
               'particle-explode': 'particleExplode 1s ease-out forwards',
               'multiplier-pop': 'multiplierPop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
@@ -46,6 +47,7 @@
               'pulse-gold': 'pulseGold 1.5s infinite',
               'flash-burst': 'flashBurst 0.8s ease-out forwards',
               'pulse-glow': 'pulseGlow 2s infinite',
+              'gradient-xy': 'gradientXY 15s ease infinite',
             },
             colors: {
               cr: {
@@ -78,6 +80,7 @@
       .perspective-1000 { perspective: 1000px; }
       .transform-style-3d { transform-style: preserve-3d; }
       .backface-hidden { backface-visibility: hidden; }
+      .will-change-transform { will-change: transform; }
       
       /* Prevent scrolling when interacting with coin */
       .touch-none { touch-action: none; }
@@ -172,6 +175,11 @@
         0% { transform: translateX(-100%) skewX(-15deg); }
         100% { transform: translateX(200%) skewX(-15deg); }
       }
+
+      @keyframes sparkle {
+         0%, 100% { opacity: 0; transform: scale(0.5); }
+         50% { opacity: 1; transform: scale(1.2) rotate(45deg); }
+      }
       
       @keyframes emberRise {
         0% { transform: translateY(0) scale(1); opacity: 0.8; }
@@ -210,6 +218,12 @@
       @keyframes pulseGlow {
            0%, 100% { box-shadow: 0 6px 0px 0px rgba(0,0,0,0.4), 0 0 0 rgba(253, 203, 45, 0); }
            50% { box-shadow: 0 6px 0px 0px rgba(0,0,0,0.4), 0 0 20px rgba(253, 203, 45, 0.6); }
+      }
+
+      @keyframes gradientXY {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
       }
 
       .text-stroke-black {

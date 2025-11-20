@@ -40,7 +40,9 @@ export const authService = {
       gamerTag: '',
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Date.now()}`,
       friends: [],
-      isNewUser: true
+      inventory: [],
+      isNewUser: true,
+      highScore: 0
     };
 
     return newUser;

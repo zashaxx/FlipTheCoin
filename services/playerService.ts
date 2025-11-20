@@ -37,7 +37,8 @@ export const playerService = {
       highScore: 0,
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${gamerTag}`,
       isNewUser: false,
-      friends: []
+      friends: [],
+      inventory: []
     };
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newPlayer));

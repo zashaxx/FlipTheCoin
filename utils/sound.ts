@@ -132,6 +132,31 @@ export const playClickSound = () => {
   osc.stop(ctx.currentTime + 0.1);
 };
 
+export const playCashSound = () => {
+  if (isMuted) return;
+  const ctx = getContext();
+  const t = ctx.currentTime;
+  
+  // "Ka-ching" effect
+  // High pitch shimmer
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(1200, t);
+  osc.frequency.linearRampToValueAtTime(2000, t + 0.1);
+  gain.gain.setValueAtTime(0.1, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+  
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + 0.4);
+
+  // Coins falling
+  for(let i=0; i<5; i++) {
+     playMarimba(1500 + (Math.random() * 500), t + (i*0.05), 0.2);
+  }
+};
+
 export const startSpinSound = () => { return () => {}; };
 export const stopSpinSound = () => {};
 
@@ -221,4 +246,36 @@ export const playMultiplierSound = () => {
   
   playMarimba(1046.50, t, 0.3);
   playMarimba(2093.00, t + 0.1, 0.3);
+};
+
+export const playEdgeSound = () => {
+  if (isMuted) return;
+  const ctx = getContext();
+  const t = ctx.currentTime;
+
+  // Mystical / Sci-Fi "Time Freeze" Sound
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(50, t);
+  osc.frequency.linearRampToValueAtTime(800, t + 1.5);
+  
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(100, t);
+  filter.frequency.linearRampToValueAtTime(2000, t + 1.0);
+  filter.Q.value = 10;
+
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(0.5, t + 0.5);
+  gain.gain.linearRampToValueAtTime(0, t + 2.0);
+
+  osc.connect(filter).connect(gain).connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + 2.0);
+
+  // Sparkles
+  playSparkle(t + 0.5);
+  playSparkle(t + 1.0);
 };

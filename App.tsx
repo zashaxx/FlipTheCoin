@@ -1,16 +1,16 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Coin } from './components/Coin';
 import { StreakDisplay } from './components/StreakDisplay';
 import { DynamicBackground } from './components/DynamicBackground';
 import { AchievementList } from './components/AchievementList';
 import { AchievementToast } from './components/AchievementToast';
 import { MilestoneOverlay } from './components/MilestoneOverlay';
-import { OnboardingModal } from './components/OnboardingModal';
-import { SocialMenu } from './components/SocialMenu';
-import { LeaderboardModal } from './components/LeaderboardModal';
-import { CoinSide, AppState, Achievement, UserProfile } from './types';
-import { playerService } from './services/playerService';
+import { ShopModal } from './components/ShopModal';
+import { BettingPanel } from './components/BettingPanel';
+import { NotificationToast } from './components/NotificationToast';
+import { SHOP_ITEMS } from './utils/shopItems';
+import { CoinSide, AppState, Achievement, AchievementRarity, Trophy, ActiveBet } from './types';
 import { 
   playFlipSound, 
   stopSpinSound,
@@ -19,110 +19,232 @@ import {
   playMilestoneSound,
   playMultiplierSound,
   toggleBackgroundMusic,
-  setGlobalMute
+  setGlobalMute,
+  playCashSound,
+  playEdgeSound
 } from './utils/sound';
 
-const ACHIEVEMENT_DEFINITIONS: Omit<Achievement, 'unlocked'>[] = [
-  { id: 'first_step', title: 'First Step', description: 'Reach a streak of 1.', icon: '🦶', condition: (s) => s >= 1 },
-  { id: 'first_spark', title: 'Spark', description: 'Reach a streak of 3.', icon: '🔥', condition: (s) => s >= 3 },
-  { id: 'coin_master', title: 'Coin Master', description: 'Reach a streak of 10.', icon: '🪙', condition: (s) => s >= 10 },
-  { id: 'lucky_break', title: 'Lucky Break', description: 'Reach a streak of 25.', icon: '🍀', condition: (s) => s >= 25 },
-  { id: 'eternal_flame', title: 'Legend', description: 'Reach a streak of 50.', icon: '♾️', condition: (s) => s >= 50 },
-  { id: 'centurion', title: 'Champion', description: 'Reach a streak of 100.', icon: '🏆', condition: (s) => s >= 100 },
-  { id: 'golden_age', title: 'Royal Lineage', description: 'Get 10 Heads in a row.', icon: '👑', condition: (s, r, h) => s >= 10 && r === CoinSide.HEADS },
-  { id: 'tails_never_fails', title: 'Rebel Force', description: 'Get 10 Tails in a row.', icon: '⚔️', condition: (s, r, h) => s >= 10 && r === CoinSide.TAILS },
-  { id: 'double_trouble', title: 'Double Up', description: 'Hit a x2 multiplier.', icon: '2️⃣', condition: (s, r, h, m) => m === 2 },
-  { id: 'multiplier_hunter', title: 'Super Luck', description: 'Hit a x10 multiplier.', icon: '⚡', condition: (s, r, h, m) => m >= 10 },
+const formatCash = (amount: number): string => {
+  if (amount >= 1000000000) return (amount / 1000000000).toFixed(2) + 'B';
+  if (amount >= 1000000) return (amount / 1000000).toFixed(2) + 'M';
+  if (amount >= 10000) return (amount / 1000).toFixed(1) + 'k';
+  return amount.toLocaleString();
+};
+
+const generateAchievements = (): Omit<Achievement, 'unlocked'>[] => {
+  const list: Omit<Achievement, 'unlocked'>[] = [];
+
+  const streakMilestones = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 
+    12, 15, 20, 25, 30, 35, 40, 45, 50, 
+    60, 70, 80, 90, 100, 125, 150, 200, 250, 300, 400, 500
+  ];
+  streakMilestones.forEach(s => {
+     let rarity = AchievementRarity.COMMON;
+     let reward = s * 15;
+     if (s >= 10) { rarity = AchievementRarity.RARE; reward = s * 30; }
+     if (s >= 25) { rarity = AchievementRarity.EPIC; reward = s * 100; }
+     if (s >= 50) { rarity = AchievementRarity.LEGENDARY; reward = s * 500; }
+     if (s >= 100) { rarity = AchievementRarity.MYTHIC; reward = s * 2000; }
+     
+     list.push({
+       id: `streak_${s}`,
+       title: `Streak Master ${s}`,
+       description: `Reach a streak of ${s}.`,
+       icon: s >= 100 ? '👑' : (s >= 50 ? '🔥' : (s >= 10 ? '⚡' : '🕯️')),
+       rarity,
+       reward,
+       condition: (currStreak) => currStreak >= s
+     });
+  });
+
+  const flipTiers = [
+    10, 25, 50, 100, 150, 200, 300, 400, 500, 600, 700, 800, 900, 1000,
+    1500, 2000, 2500, 3000, 4000, 5000, 7500, 10000, 
+    15000, 20000, 30000, 40000, 50000, 75000, 100000
+  ];
+  flipTiers.forEach(t => {
+    let rarity = AchievementRarity.COMMON;
+    let reward = Math.floor(t * 0.5);
+    if (t >= 500) { rarity = AchievementRarity.RARE; reward = t; }
+    if (t >= 2500) { rarity = AchievementRarity.EPIC; reward = t * 2; }
+    if (t >= 10000) { rarity = AchievementRarity.LEGENDARY; reward = t * 5; }
+    if (t >= 50000) { rarity = AchievementRarity.MYTHIC; reward = t * 10; }
+
+    list.push({
+      id: `total_${t}`,
+      title: `Flipper ${t}`,
+      description: `Flip the coin ${t} times total.`,
+      icon: '🪙',
+      rarity,
+      reward,
+      condition: (s, r, h, m, total) => total >= t
+    });
+  });
+
+  [2, 4, 10].forEach(m => {
+     list.push({
+       id: `mult_${m}`,
+       title: `Lucky x${m}`,
+       description: `Get a x${m} multiplier.`,
+       icon: '🎰',
+       rarity: m === 10 ? AchievementRarity.EPIC : AchievementRarity.COMMON,
+       reward: m * 200,
+       condition: (s, r, h, mult) => mult >= m
+     });
+  });
+
+  return list;
+};
+
+const BASE_ACHIEVEMENTS: Omit<Achievement, 'unlocked'>[] = [
+  { id: 'c_heads_start', title: 'Heads Up', description: 'Get 3 Heads in a row.', icon: '🙂', rarity: AchievementRarity.COMMON, reward: 50, condition: (s, r, h) => h.slice(0,3).every(x => x === CoinSide.HEADS) && h.length >= 3 },
+  { id: 'c_tails_start', title: 'Tail Spin', description: 'Get 3 Tails in a row.', icon: '🐈', rarity: AchievementRarity.COMMON, reward: 50, condition: (s, r, h) => h.slice(0,3).every(x => x === CoinSide.TAILS) && h.length >= 3 },
+  { id: 'e_prophet', title: 'Prophet', description: 'Get 10 Heads in a row.', icon: '🔮', rarity: AchievementRarity.EPIC, reward: 5000, condition: (s, r, h) => h.slice(0,10).every(x => x === CoinSide.HEADS) && h.length >= 10 },
+  { id: 'e_rebel', title: 'Rebel', description: 'Get 10 Tails in a row.', icon: '⚔️', rarity: AchievementRarity.EPIC, reward: 5000, condition: (s, r, h) => h.slice(0,10).every(x => x === CoinSide.TAILS) && h.length >= 10 },
+  { id: 'l_high_roller', title: 'High Roller', description: 'Get x10 Multiplier twice in a row.', icon: '💎', rarity: AchievementRarity.LEGENDARY, reward: 25000, condition: (s, r, h, m, t, pm) => m === 10 && pm === 10 },
+  { id: 'm_impossible', title: 'The Impossible', description: 'Land on the Edge.', icon: '😱', rarity: AchievementRarity.MYTHIC, reward: 1000000, condition: (s, r) => r === CoinSide.EDGE },
 ];
+
+const ALL_ACHIEVEMENTS = [...BASE_ACHIEVEMENTS, ...generateAchievements()];
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
   const [result, setResult] = useState<CoinSide>(CoinSide.HEADS);
   const [history, setHistory] = useState<CoinSide[]>([]);
   
-  // User & Auth State
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [isAutoSpin, setIsAutoSpin] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
+
+  const [cash, setCash] = useState(100);
+  const [inventory, setInventory] = useState<string[]>([]);
+  const [activeBet, setActiveBet] = useState<ActiveBet | null>(null);
   
-  // UI Panels
+  const [lastWin, setLastWin] = useState(0);
+  const [notification, setNotification] = useState<{msg: string, type: 'error'|'success'|'info'} | null>(null);
+
   const [isDebugMenuOpen, setIsDebugMenuOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isSocialMenuOpen, setIsSocialMenuOpen] = useState(false);
-  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [isShopOpen, setIsShopOpen] = useState(false);
+  const [isBettingOpen, setIsBettingOpen] = useState(false);
   
-  // Debug Logic
   const [forceEdge, setForceEdge] = useState(false);
   const [forceHeads, setForceHeads] = useState(false);
   const [forceTails, setForceTails] = useState(false);
   const [forceMultiplier, setForceMultiplier] = useState<number | null>(null);
   const [showAchievements, setShowAchievements] = useState(true); 
   
-  // Stats
   const [streak, setStreak] = useState(0);
   const [highScore, setHighScore] = useState(0);
+  const [totalFlips, setTotalFlips] = useState(0);
   const [streakSide, setStreakSide] = useState<CoinSide | null>(null);
+  
   const [currentMultiplier, setCurrentMultiplier] = useState<number>(1);
+  const [previousMultiplier, setPreviousMultiplier] = useState<number>(1);
   const [activeMultiplier, setActiveMultiplier] = useState<number | null>(null); 
+  
   const [isFlash, setIsFlash] = useState(false);
   const [isStreakBroken, setIsStreakBroken] = useState(false);
   
-  // Milestones
   const [milestoneStreak, setMilestoneStreak] = useState<number | null>(null);
+  const [isEdgePopup, setIsEdgePopup] = useState(false);
   const [highScoreMilestoneShown, setHighScoreMilestoneShown] = useState(false);
   
-  // Audio
   const [soundEnabled, setSoundEnabled] = useState(true);
-
-  // Toast / Unlocks
   const [unlockedAchievements, setUnlockedAchievements] = useState<Set<string>>(new Set());
-  const [toastQueue, setToastQueue] = useState<{title: string, icon: string}[]>([]);
-  const [activeToast, setActiveToast] = useState<{title: string, icon: string} | null>(null);
+  const [toastQueue, setToastQueue] = useState<{title: string, icon: string, rarity: AchievementRarity, reward: number}[]>([]);
+  const [activeToast, setActiveToast] = useState<{title: string, icon: string, rarity: AchievementRarity, reward: number} | null>(null);
 
-  // --- INITIALIZATION ---
+  // Ref to store pending calculation data to avoid race conditions
+  const flipRef = useRef<{
+      result: CoinSide;
+      multiplier: number;
+      lastMultiplier: number;
+  }>({ result: CoinSide.HEADS, multiplier: 1, lastMultiplier: 1 });
+
   useEffect(() => {
-    const storedUser = playerService.getPlayer();
-    if (storedUser) {
-      setUser(storedUser);
-      setHighScore(storedUser.highScore);
-    } else {
-      setShowOnboarding(true);
+    const storedScore = localStorage.getItem('cosmic_coin_highscore');
+    if (storedScore) setHighScore(parseInt(storedScore, 10));
+
+    const storedFlips = localStorage.getItem('cosmic_coin_total_flips');
+    if (storedFlips) setTotalFlips(parseInt(storedFlips, 10));
+
+    const storedCash = localStorage.getItem('cosmic_coin_cash');
+    if (storedCash) setCash(parseInt(storedCash, 10));
+    else setCash(100); 
+
+    const storedInventory = localStorage.getItem('cosmic_coin_inventory');
+    if (storedInventory) {
+       try { setInventory(JSON.parse(storedInventory)); } catch (e) {}
+    }
+
+    const storedUnlocks = localStorage.getItem('cosmic_coin_achievements');
+    if (storedUnlocks) {
+      try { setUnlockedAchievements(new Set(JSON.parse(storedUnlocks))); } catch (e) {}
     }
   }, []);
-
-  // --- USER ACTIONS ---
-  const handleOnboardingComplete = (name: string, age: number) => {
-    playMilestoneSound();
-    const newUser = playerService.createPlayer(name, age);
-    setUser(newUser);
-    setShowOnboarding(false);
-    setToastQueue(prev => [...prev, { title: `Welcome, ${newUser.gamerTag}!`, icon: '👋' }]);
-  };
-
-  const handleLogout = () => {
-    // In this version, logout just resets (optional feature, mostly for debugging)
-    localStorage.removeItem('cosmic_coin_player_v1');
-    window.location.reload();
-  };
 
   const updateHighScore = (newScore: number) => {
     if (newScore > highScore) {
        setHighScore(newScore);
-       if (user) {
-          const updated = playerService.updateHighScore(user, newScore);
-          setUser(updated);
-       }
+       localStorage.setItem('cosmic_coin_highscore', newScore.toString());
     }
   };
 
-  // --- SOUND & UI ---
-  const toggleSound = () => {
-    const newState = !soundEnabled;
-    setSoundEnabled(newState);
-    setGlobalMute(!newState);
-    if (newState) toggleBackgroundMusic(true);
-  }
+  const incrementTotalFlips = () => {
+    const newTotal = totalFlips + 1;
+    setTotalFlips(newTotal);
+    localStorage.setItem('cosmic_coin_total_flips', newTotal.toString());
+    return newTotal;
+  };
 
-  // Toast Manager
+  const updateCash = (amount: number) => {
+     setCash(prev => {
+       const newVal = Math.max(0, prev + amount);
+       localStorage.setItem('cosmic_coin_cash', newVal.toString());
+       return newVal;
+     });
+  };
+
+  const showNotification = (msg: string, type: 'error' | 'success' | 'info') => {
+    setNotification({ msg, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleBuyItem = (item: Trophy) => {
+     if (cash >= item.price) {
+        updateCash(-item.price);
+        const newInv = [...inventory, item.id];
+        setInventory(newInv);
+        localStorage.setItem('cosmic_coin_inventory', JSON.stringify(newInv));
+        playCashSound();
+        showNotification(`Purchased ${item.name}!`, 'success');
+     }
+  };
+
+  const handleEasterEgg = () => {
+     setIsDebugMenuOpen(true);
+     showNotification("DEV MODE UNLOCKED", 'success');
+     playRevealSound('LEGENDARY');
+  };
+
+  const handlePlaceBet = (amount: number, target: number) => {
+     if (amount > cash) return;
+     updateCash(-amount);
+     
+     const steps = Math.max(1, target - streak);
+     const payout = Math.floor(amount * Math.pow(1.9, steps));
+     
+     setActiveBet({
+        amount,
+        targetStreak: target,
+        startStreak: streak,
+        potentialPayout: payout
+     });
+     playClickSound();
+     setIsBettingOpen(false); 
+  };
+
   useEffect(() => {
     if (activeToast === null && toastQueue.length > 0) {
       setActiveToast(toastQueue[0]);
@@ -132,103 +254,64 @@ export default function App() {
   }, [activeToast, toastQueue]);
 
   const unlockAchievement = (id: string) => {
-    const def = ACHIEVEMENT_DEFINITIONS.find(a => a.id === id);
+    const def = ALL_ACHIEVEMENTS.find(a => a.id === id);
     if (def && !unlockedAchievements.has(id)) {
-      setUnlockedAchievements(prev => new Set(prev).add(id));
+      const newSet = new Set(unlockedAchievements).add(id);
+      setUnlockedAchievements(newSet);
+      localStorage.setItem('cosmic_coin_achievements', JSON.stringify(Array.from(newSet)));
+      updateCash(def.reward); 
+
       if (showAchievements) {
-         setToastQueue(prev => [...prev, { title: def.title, icon: def.icon }]);
+         setToastQueue(prev => [...prev, { title: def.title, icon: def.icon, rarity: def.rarity, reward: def.reward }]);
+         playCashSound();
       }
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
     }
   }
 
-  const checkAchievements = (newStreak: number, newResult: CoinSide, newHistory: CoinSide[], multiplier: number) => {
-    ACHIEVEMENT_DEFINITIONS.forEach(def => {
+  const checkAchievements = (newStreak: number, newResult: CoinSide, newHistory: CoinSide[], multiplier: number, currentTotalFlips: number, prevMult: number) => {
+    ALL_ACHIEVEMENTS.forEach(def => {
       if (!unlockedAchievements.has(def.id)) {
-        if (def.condition && def.condition(newStreak, newResult, newHistory, multiplier)) {
+        if (def.condition && def.condition(newStreak, newResult, newHistory, multiplier, currentTotalFlips, prevMult)) {
            unlockAchievement(def.id);
         }
       }
     });
   };
 
-  // --- GAME LOGIC ---
-  const handleFlip = () => {
-    if (appState === AppState.FLIPPING) return;
-    
-    // Close UI panels
-    setIsMenuOpen(false);
-    setIsSocialMenuOpen(false);
-    setIsLeaderboardOpen(false);
-    setMilestoneStreak(null);
-    
-    setIsFlash(false);
-    setIsStreakBroken(false);
-    setCurrentMultiplier(1);
-    setActiveMultiplier(null); 
-    
-    playFlipSound();
-
-    // Determine Result
-    let newResult: CoinSide;
-    if (forceEdge) newResult = CoinSide.EDGE;
-    else if (forceHeads) newResult = CoinSide.HEADS;
-    else if (forceTails) newResult = CoinSide.TAILS;
-    else newResult = Math.random() < 0.00001 ? CoinSide.EDGE : (Math.random() > 0.5 ? CoinSide.HEADS : CoinSide.TAILS);
-    
-    setResult(newResult);
-    setAppState(AppState.FLIPPING);
-
-    // Calculate Multiplier
-    let pendingMultiplier = 1;
-    if (forceMultiplier !== null) {
-       pendingMultiplier = forceMultiplier;
-    } else {
-       let chance = 0.3 / (1 + (streak * 0.1));
-       if (streak > 200) chance = 0.001; 
-       if (Math.random() < chance) {
-          const tier = Math.random();
-          pendingMultiplier = tier > 0.90 ? 10 : (tier > 0.70 ? 4 : 2); 
-       }
-    }
-
-    if (pendingMultiplier > 1) {
-       setTimeout(() => {
-          setActiveMultiplier(pendingMultiplier);
-          playMultiplierSound();
-       }, 300); 
-    }
-
-    if (navigator.vibrate) navigator.vibrate(10);
-
-    // Finish Flip
-    setTimeout(() => {
-      stopSpinSound();
-      setAppState(AppState.RESULT);
-      
+  const finalizeFlip = (newResult: CoinSide, pendingMultiplier: number, lastMult: number) => {
+      const newTotalFlips = incrementTotalFlips();
       let newStreak = 1;
       
       if (newResult === CoinSide.EDGE) {
-        newStreak = 0; 
-        setStreakSide(null);
+        newStreak = streak; 
         setHighScoreMilestoneShown(false); 
-        playRevealSound('LEGENDARY');
+        playEdgeSound(); // SPECIFIC EDGE SOUND
+        setIsEdgePopup(true);
+        const payout = 10000;
+        updateCash(payout);
+        setLastWin(payout);
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
       } else {
         const isStreakCheck = streakSide === newResult;
-        
-        if (isStreakCheck) {
-            newStreak = (streak + 1) * pendingMultiplier;
+        if (isStreakCheck || streak === 0) {
+            newStreak = streak + 1;
+            if (newStreak > 1 && Math.random() < 0.05) {
+               const luckyFind = 10 * pendingMultiplier;
+               updateCash(luckyFind);
+               setLastWin(luckyFind);
+               playCashSound();
+            }
         } else {
             setIsStreakBroken(true);
-            newStreak = 1; 
+            newStreak = 0; 
             setHighScoreMilestoneShown(false); 
             setTimeout(() => setIsStreakBroken(false), 2000);
         }
         
-        if (pendingMultiplier >= 4 && isStreakCheck) {
+        if (pendingMultiplier >= 4 && (isStreakCheck || streak === 0)) {
            playRevealSound('LEGENDARY');
            setIsFlash(true);
-           if (navigator.vibrate) navigator.vibrate([50, 50, 100]);
         } else if (pendingMultiplier === 2 || newStreak > 10) {
            playRevealSound('RARE');
         } else {
@@ -236,16 +319,30 @@ export default function App() {
         }
       }
       
+      if (activeBet) {
+         if (newResult === CoinSide.EDGE) {
+             updateCash(activeBet.potentialPayout * 10);
+             showNotification(`EDGE! Jackpot x10!`, 'success');
+             setActiveBet(null);
+         } else if (newStreak >= activeBet.targetStreak) {
+             updateCash(activeBet.potentialPayout);
+             setLastWin(activeBet.potentialPayout);
+             showNotification(`Bet Won! +$${activeBet.potentialPayout}`, 'success');
+             playCashSound();
+             setActiveBet(null);
+         } else if (newStreak === 0 && streak > 0) {
+             showNotification(`Bet Lost!`, 'error');
+             setActiveBet(null);
+         }
+      }
+
       setCurrentMultiplier(pendingMultiplier);
       setStreak(newStreak);
       if (newResult !== CoinSide.EDGE) setStreakSide(newResult);
       
-      // Handle High Score Logic
       if (newStreak > highScore) {
-        updateHighScore(newStreak); // Persist
-        
-        // Only trigger milestone popup ONCE per run when you first break the record
-        if (newStreak > 2 && !highScoreMilestoneShown) {
+        updateHighScore(newStreak);
+        if (newStreak > 2 && !highScoreMilestoneShown && newResult !== CoinSide.EDGE) {
            setTimeout(() => {
               setMilestoneStreak(newStreak);
               setHighScoreMilestoneShown(true); 
@@ -256,174 +353,397 @@ export default function App() {
       
       const newHistory = [newResult, ...history].slice(0, 6);
       setHistory(newHistory);
-      checkAchievements(newStreak, newResult, newHistory, pendingMultiplier);
-
-    }, 1200); 
+      checkAchievements(newStreak, newResult, newHistory, pendingMultiplier, newTotalFlips, lastMult);
+      
+      setAppState(AppState.RESULT);
+      setIsStopping(false);
+      stopSpinSound();
   };
 
+  // Triggered by Coin component when physics has completely settled
+  const handleSpinComplete = () => {
+      const { result, multiplier, lastMultiplier } = flipRef.current;
+      finalizeFlip(result, multiplier, lastMultiplier);
+  };
+
+  const handleFlipAction = () => {
+    // If in auto-spin mode and already flipping, this button acts as STOP
+    if (isAutoSpin && appState === AppState.FLIPPING) {
+       if (isStopping) return; 
+       setIsStopping(true);
+       playClickSound();
+       
+       // Calculate Result immediately for deterministic stopping
+       let newResult: CoinSide;
+       if (forceEdge) newResult = CoinSide.EDGE;
+       else if (forceHeads) newResult = CoinSide.HEADS;
+       else if (forceTails) newResult = CoinSide.TAILS;
+       else {
+         // 0.001% Chance for Edge (1 in 100,000)
+         const isEdge = Math.random() < 0.00001;
+         if (isEdge) newResult = CoinSide.EDGE;
+         else newResult = Math.random() > 0.5 ? CoinSide.HEADS : CoinSide.TAILS;
+       }
+       setResult(newResult);
+       
+       // Calculate Multiplier
+       let pendingMultiplier = 1;
+       if (streak >= 2) { 
+           if (forceMultiplier !== null) {
+              pendingMultiplier = forceMultiplier;
+           } else {
+              let chance = 0.3 / (1 + (streak * 0.1));
+              if (streak > 200) chance = 0.001; 
+              if (Math.random() < chance) {
+                 const tier = Math.random();
+                 pendingMultiplier = tier > 0.90 ? 10 : (tier > 0.70 ? 4 : 2); 
+              }
+           }
+       }
+       
+       // Store for callback
+       flipRef.current = { 
+           result: newResult, 
+           multiplier: pendingMultiplier, 
+           lastMultiplier: currentMultiplier 
+       };
+       
+       return;
+    }
+    
+    if (appState === AppState.FLIPPING) return;
+    
+    if (cash <= 0 && !activeBet) {
+       const bonus = 100;
+       updateCash(bonus);
+       playCashSound();
+       showNotification("Bankrupt! Welfare Bonus: $100", 'success');
+       return; 
+    }
+    
+    // Reset UI
+    setIsMenuOpen(false);
+    setIsShopOpen(false);
+    setIsBettingOpen(false);
+    setMilestoneStreak(null);
+    setIsEdgePopup(false);
+    setIsFlash(false);
+    setIsStreakBroken(false);
+    setLastWin(0);
+    
+    setPreviousMultiplier(currentMultiplier);
+    const lastMult = currentMultiplier;
+    setCurrentMultiplier(1);
+    setActiveMultiplier(null); 
+    
+    playFlipSound();
+
+    // Calculate Result
+    let newResult: CoinSide;
+    if (forceEdge) newResult = CoinSide.EDGE;
+    else if (forceHeads) newResult = CoinSide.HEADS;
+    else if (forceTails) newResult = CoinSide.TAILS;
+    else {
+      // 0.001% Chance for Edge (1 in 100,000)
+      const isEdge = Math.random() < 0.00001;
+      if (isEdge) newResult = CoinSide.EDGE;
+      else newResult = Math.random() > 0.5 ? CoinSide.HEADS : CoinSide.TAILS;
+    }
+    
+    setResult(newResult);
+    setAppState(AppState.FLIPPING);
+    setIsStopping(false);
+
+    let pendingMultiplier = 1;
+    if (streak >= 2) { 
+        if (forceMultiplier !== null) {
+           pendingMultiplier = forceMultiplier;
+        } else {
+           let chance = 0.3 / (1 + (streak * 0.1));
+           if (streak > 200) chance = 0.001; 
+           if (Math.random() < chance) {
+              const tier = Math.random();
+              pendingMultiplier = tier > 0.90 ? 10 : (tier > 0.70 ? 4 : 2); 
+           }
+        }
+    }
+
+    if (pendingMultiplier > 1 && newResult !== CoinSide.EDGE) {
+       setTimeout(() => { setActiveMultiplier(pendingMultiplier); playMultiplierSound(); }, 300); 
+    }
+    if (navigator.vibrate) navigator.vibrate(10);
+
+    // Store for callback
+    flipRef.current = { 
+        result: newResult, 
+        multiplier: pendingMultiplier, 
+        lastMultiplier: lastMult 
+    };
+  };
+
+  const toggleSound = () => {
+    const newState = !soundEnabled;
+    setSoundEnabled(newState);
+    setGlobalMute(!newState);
+    if (newState) toggleBackgroundMusic(true);
+  }
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-between py-6 relative overflow-hidden font-sans select-none">
+    <div className="h-[100dvh] w-full overflow-hidden bg-[#1C2B4B] text-white font-sans select-none flex flex-col relative touch-none">
       
       <DynamicBackground streak={streak} appState={appState} isBroken={isStreakBroken} result={result} />
 
       {/* Overlays */}
-      {activeToast && showAchievements && <AchievementToast title={activeToast.title} icon={activeToast.icon} />}
+      {notification && <NotificationToast message={notification.msg} type={notification.type} />}
+      {activeToast && showAchievements && (
+         <AchievementToast 
+            title={activeToast.title} 
+            icon={activeToast.icon} 
+            rarity={activeToast.rarity}
+            reward={activeToast.reward}
+         />
+      )}
       {isFlash && <div className="fixed inset-0 z-[60] bg-white animate-flash-screen pointer-events-none"></div>}
       
-      {/* ONBOARDING */}
-      {showOnboarding && (
-         <OnboardingModal onComplete={handleOnboardingComplete} />
-      )}
-
-      {/* MILESTONE POPUP */}
-      {milestoneStreak && (
-         <MilestoneOverlay streak={milestoneStreak} onDismiss={() => setMilestoneStreak(null)} />
-      )}
-
-      {/* LEADERBOARD MODAL */}
-      {isLeaderboardOpen && (
-         <LeaderboardModal user={user} onClose={() => setIsLeaderboardOpen(false)} />
-      )}
-      
-      {/* Top Left Buttons */}
-      <div className="absolute top-4 left-4 z-50 flex gap-3">
-        <button onClick={() => { playClickSound(); setIsMenuOpen(!isMenuOpen); setIsSocialMenuOpen(false); }} className="game-btn-small">
-           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5" /></svg>
-        </button>
-        <button onClick={toggleSound} className={`game-btn-small ${soundEnabled ? 'text-yellow-300' : 'text-slate-400'}`}>
-           {soundEnabled ? '🔊' : '🔇'}
-        </button>
-      </div>
-
-      {/* Top Right Buttons (Social / Leaderboard) */}
-      <div className="absolute top-4 right-4 z-50 flex gap-3">
-         {/* Leaderboard Button */}
-         <button 
-            onClick={() => { playClickSound(); setIsLeaderboardOpen(true); }}
-            className="game-btn-small text-[#FDCB2D]"
-         >
-             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6">
-               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0V5.625a1.125 1.125 0 00-1.125-1.125h-2.25a1.125 1.125 0 00-1.125 1.125V14.25m5.828 0A9.094 9.094 0 0112 14.25m3 4.5v.375" />
-             </svg>
-         </button>
-
-         {user && (
-            <button 
-              onClick={() => { playClickSound(); setIsSocialMenuOpen(!isSocialMenuOpen); setIsMenuOpen(false); }} 
-              className="game-btn-small relative"
-            >
-               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-6 h-6 text-purple-300"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
-               {user.friends?.length > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-[#1A4BA0]"></span>}
-            </button>
-         )}
-         
-         <button 
-           onClick={() => setIsDebugMenuOpen(!isDebugMenuOpen)} 
-           className="px-2 py-1 bg-black/20 text-xs text-white/30 rounded hover:text-white transition-colors"
-         >
-           ?
-         </button>
-      </div>
-
-      {/* LEFT MENU - STATS */}
-      <div className={`fixed inset-y-0 left-0 w-72 bg-[#1A4BA0] border-r-4 border-[#FDCB2D] shadow-2xl transform transition-transform duration-300 z-[100] p-6 overflow-y-auto ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-         <h2 className="text-3xl text-[#FDCB2D] mb-6 text-stroke-black drop-shadow-md">STATS</h2>
-         <div className="space-y-2 font-body text-white">
-             <p>Best Streak: <span className="text-[#FDCB2D] font-bold">{highScore}</span></p>
-             {user && <p>Tag: <span className="text-purple-300 font-bold">{user.gamerTag}</span></p>}
-             <AchievementList achievements={ACHIEVEMENT_DEFINITIONS.map(def => ({...def, unlocked: unlockedAchievements.has(def.id)}))} />
-         </div>
-      </div>
-      {isMenuOpen && <div onClick={() => setIsMenuOpen(false)} className="fixed inset-0 bg-black/60 z-[90]"></div>}
-
-      {/* RIGHT MENU - SOCIAL */}
-      {user && (
-         <SocialMenu 
-            user={user} 
-            isOpen={isSocialMenuOpen} 
-            onClose={() => setIsSocialMenuOpen(false)}
-            onAddFriend={() => {}}
-            onRemoveFriend={() => {}}
-            onLogout={handleLogout}
+      {(milestoneStreak || isEdgePopup) && (
+         <MilestoneOverlay 
+            streak={milestoneStreak || streak} 
+            isEdge={isEdgePopup}
+            onDismiss={() => {
+              setMilestoneStreak(null);
+              setIsEdgePopup(false);
+            }} 
          />
       )}
 
-      {/* Main Area */}
-      <div className="z-10 flex-grow flex flex-col items-center justify-center w-full mt-4 mb-16">
-        <div className="mb-4 w-full flex justify-center">
-          <StreakDisplay 
-             streak={streak} 
-             highScore={highScore} 
-             currentSide={streakSide} 
-             lastMultiplier={currentMultiplier} 
-             activeMultiplier={activeMultiplier}
-             appState={appState} 
-          />
+      {isShopOpen && (
+         <ShopModal 
+            cash={cash} 
+            inventory={inventory} 
+            onBuy={handleBuyItem} 
+            onClose={() => setIsShopOpen(false)} 
+            onEasterEgg={handleEasterEgg}
+         />
+      )}
+
+      {isBettingOpen && (
+         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-pop-in" onClick={() => setIsBettingOpen(false)}>
+            <div className="w-full max-w-md" onClick={e => e.stopPropagation()}>
+               <div className="bg-[#1C2B4B] rounded-2xl border-2 border-blue-500 shadow-2xl overflow-hidden">
+                  <div className="bg-blue-900/50 p-4 flex justify-between items-center border-b border-blue-500/30">
+                     <h3 className="text-white font-black text-xl uppercase italic tracking-wider">Wager Station</h3>
+                     <button onClick={() => setIsBettingOpen(false)} className="text-blue-300 hover:text-white font-bold">✕</button>
+                  </div>
+                  <div className="p-4">
+                    <BettingPanel 
+                      cash={cash} 
+                      currentStreak={streak} 
+                      onPlaceBet={handlePlaceBet} 
+                      activeBet={activeBet}
+                      disabled={appState === AppState.FLIPPING}
+                    />
+                  </div>
+               </div>
+            </div>
+         </div>
+      )}
+
+      {/* --- HEADER --- */}
+      <div className="absolute top-0 left-0 w-full p-3 z-50 flex justify-between items-start pointer-events-none">
+          <div className="flex gap-3 pointer-events-auto items-center">
+            <button onClick={() => { playClickSound(); setIsMenuOpen(!isMenuOpen); }} className="relative group w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-gradient-to-br from-[#FFD700] to-[#FFA500] rounded-full shadow-lg border-2 border-[#FFF] hover:scale-110 transition-transform active:scale-95">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 sm:w-6 sm:h-6 text-[#78350F] drop-shadow-md">
+                  <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z" clipRule="evenodd" />
+              </svg>
+              {unlockedAchievements.size > 0 && <span className="absolute 0 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse border-2 border-white"></span>}
+            </button>
+
+            {/* AUTO SPIN TOGGLE */}
+            <div 
+               onClick={() => { if (appState !== AppState.FLIPPING) setIsAutoSpin(!isAutoSpin); }}
+               className={`w-12 h-6 rounded-full relative cursor-pointer transition-colors duration-300 border-2 border-white/20 shadow-inner ${isAutoSpin ? 'bg-green-500' : 'bg-slate-700'} ${appState === AppState.FLIPPING ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300 ${isAutoSpin ? 'translate-x-6' : 'translate-x-0.5'}`}></div>
+            </div>
+            
+            <button onClick={toggleSound} className={`w-10 h-10 sm:w-12 sm:h-12 bg-black/30 backdrop-blur rounded-full flex items-center justify-center border border-white/10 hover:bg-black/50 ${soundEnabled ? 'text-white' : 'text-red-400'}`}>
+              {soundEnabled ? '🔊' : '🔇'}
+            </button>
+          </div>
+
+          <div className="flex flex-col items-end gap-2 pointer-events-auto">
+                {/* Cash Display */}
+                <div 
+                    onClick={() => setIsShopOpen(true)}
+                    className="bg-slate-900/80 backdrop-blur-md border-2 border-[#FFD700] pl-2 pr-3 py-1.5 rounded-2xl shadow-[0_0_15px_rgba(255,215,0,0.3)] flex items-center gap-2 animate-slide-in-right cursor-pointer hover:bg-slate-800 transition-colors group max-w-[160px] sm:max-w-[220px] overflow-hidden"
+                >
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 bg-gradient-to-br from-[#FFD700] to-[#FFA500] rounded-full flex items-center justify-center text-[#78350F] font-black text-sm sm:text-lg shadow-inner group-hover:rotate-12 transition-transform">$</div>
+                    <span className="text-xl sm:text-2xl font-black text-white tabular-nums tracking-wider truncate">{formatCash(cash)}</span>
+                </div>
+                
+                {/* Wager Button - Nicely Columned */}
+                <button 
+                    onClick={() => { playClickSound(); setIsBettingOpen(true); }}
+                    className="w-full px-3 py-1.5 bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest text-white shadow-lg border border-blue-400 hover:brightness-110 active:scale-95 transition-all animate-slide-in-right text-center flex items-center justify-center gap-1"
+                    style={{ animationDelay: '0.1s' }}
+                >
+                    <span>WAGER</span>
+                    <span className="bg-black/20 px-1 rounded">BET</span>
+                </button>
+                
+                {/* Shop Icons (Below Wager now for cleaner header or kept to left? Let's keep them left in flex row below) */}
+                 <div className="flex -space-x-2 items-center pt-1 self-end">
+                  {inventory.slice(-3).map((id, idx) => {
+                      const item = SHOP_ITEMS.find(i => i.id === id);
+                      if(!item) return null;
+                      return (
+                        <div 
+                          key={idx} 
+                          className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white bg-slate-800 flex items-center justify-center text-base sm:text-lg shadow-lg relative z-0 transform hover:scale-110 transition-transform animate-pulse-glow" 
+                          style={{zIndex: idx}}
+                        >
+                            {item.icon}
+                        </div>
+                      )
+                  })}
+                </div>
+          </div>
+      </div>
+
+      {/* LEFT MENU DRAWER */}
+      <div className={`fixed inset-y-0 left-0 w-80 sm:w-96 bg-[#0F172A] border-r-2 border-[#FDCB2D] shadow-2xl transform transition-transform duration-300 z-[100] flex flex-col ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+         <div className="p-6 bg-gradient-to-r from-[#1e293b] to-[#0F172A] border-b border-slate-700 relative overflow-hidden">
+            <div className="absolute right-[-20px] top-[-20px] text-[80px] opacity-10">🏆</div>
+            <h2 className="text-3xl text-[#FDCB2D] mb-1 text-stroke-black drop-shadow-md font-black uppercase italic relative z-10">Achievements</h2>
+            <div className="text-xs text-slate-400 font-mono relative z-10">Unlocked: {unlockedAchievements.size} / {ALL_ACHIEVEMENTS.length}</div>
+         </div>
+         <div className="p-6 flex-1 overflow-y-auto">
+             <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                   <div className="text-[10px] uppercase text-slate-500 font-bold">Best Streak</div>
+                   <div className="text-2xl font-black text-[#FDCB2D]">{highScore}</div>
+                </div>
+                <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                   <div className="text-[10px] uppercase text-slate-500 font-bold">Total Flips</div>
+                   <div className="text-2xl font-black text-white">{formatCash(totalFlips).replace('k','K')}</div>
+                </div>
+             </div>
+             <AchievementList achievements={ALL_ACHIEVEMENTS.map(def => ({...def, unlocked: unlockedAchievements.has(def.id)}))} />
+         </div>
+      </div>
+      {isMenuOpen && <div onClick={() => setIsMenuOpen(false)} className="fixed inset-0 bg-black/60 z-[90] backdrop-blur-sm"></div>}
+
+      {/* --- MAIN GAME CONTENT --- */}
+      <div className="flex-1 flex flex-col items-center justify-center w-full relative z-10 min-h-0">
+        
+        <div className="w-full flex flex-col items-center justify-center origin-bottom scale-75 sm:scale-100">
+            <StreakDisplay 
+              streak={streak} 
+              highScore={highScore} 
+              currentSide={streakSide} 
+              lastMultiplier={currentMultiplier} 
+              activeMultiplier={activeMultiplier}
+              appState={appState} 
+            />
         </div>
 
-        <div className="relative z-20 scale-90 sm:scale-100">
-           <Coin appState={appState} result={result} onFlip={handleFlip} />
+        <div className="relative z-20 transition-transform transform scale-[0.6] sm:scale-90 flex-shrink-0 mt-4">
+           <Coin 
+              appState={appState} 
+              result={result} 
+              onFlip={handleFlipAction} 
+              onSpinComplete={handleSpinComplete}
+              isAutoSpin={isAutoSpin}
+              isStopping={isStopping}
+           />
         </div>
 
-        <div className="h-24 flex items-center justify-center text-center mt-6 z-30 pointer-events-none">
+        <div className="h-16 flex items-center justify-center text-center mt-2 z-30 pointer-events-none flex-shrink-0">
           {appState === AppState.RESULT && (
-             <div className="animate-pop-in">
+             <div className="animate-pop-in flex flex-col items-center">
                 <p 
                   className={`
-                    text-7xl font-black text-stroke-black drop-shadow-[0_8px_0_rgba(0,0,0,0.5)] tracking-tighter
-                    ${result === CoinSide.HEADS ? 'text-[#FDCB2D]' : 'text-white'} 
-                    ${result === CoinSide.TAILS ? 'text-[#ff6b6b]' : ''}
+                    text-5xl sm:text-7xl font-black text-stroke-black drop-shadow-[0_8px_0_rgba(0,0,0,0.5)] tracking-tighter
+                    ${result === CoinSide.HEADS ? 'text-[#FDCB2D]' : (result === CoinSide.TAILS ? 'text-[#E0E0E0]' : 'text-[#00FFFF]')}
                   `}
                 >
                   {result}
                 </p>
+                {lastWin > 0 && (
+                   <div className="text-2xl sm:text-3xl font-black text-green-400 text-stroke-sm drop-shadow-md animate-bounce mt-1">
+                      +${lastWin.toLocaleString()}
+                   </div>
+                )}
              </div>
           )}
         </div>
       </div>
 
-      {/* Footer Button */}
-      <div className="z-20 w-full flex flex-col items-center px-6 pb-10">
+      <div className="z-20 w-full flex flex-col items-center px-4 pb-6 shrink-0 bg-gradient-to-t from-[#1C2B4B] via-[#1C2B4B]/90 to-transparent pt-6">
+        
+        {activeBet && !isBettingOpen && (
+            <div 
+               onClick={() => setIsBettingOpen(true)}
+               className="mb-4 bg-blue-900/80 backdrop-blur border border-blue-400 px-4 py-1.5 rounded-full flex items-center gap-3 cursor-pointer animate-pulse-gold hover:scale-105 transition-transform shadow-[0_0_20px_rgba(59,130,246,0.5)] max-w-full truncate"
+            >
+               <span className="text-[10px] font-bold text-blue-200 uppercase tracking-widest">Bet</span>
+               <span className="text-base font-black text-white">${activeBet.amount} ➜ ${activeBet.potentialPayout}</span>
+            </div>
+        )}
+
         <button
-          onClick={handleFlip}
-          disabled={appState === AppState.FLIPPING}
+          onClick={handleFlipAction}
+          disabled={appState === AppState.FLIPPING && !isAutoSpin}
           className={`
-            w-full max-w-xs h-20 rounded-2xl text-3xl tracking-wider uppercase font-black text-stroke-sm
-            transition-all duration-100 shadow-game-button mb-8 relative overflow-hidden
+            w-full max-w-xs h-16 sm:h-20 rounded-2xl text-2xl sm:text-3xl tracking-wider uppercase font-black text-stroke-sm
+            transition-all duration-100 shadow-game-button mb-4 relative overflow-hidden
             ${appState === AppState.FLIPPING 
-              ? 'bg-slate-600 border-b-4 border-slate-800 text-slate-400 cursor-default transform scale-95' 
+              ? (isAutoSpin 
+                  ? (isStopping ? 'bg-red-800 border-red-950 text-red-300 cursor-wait' : 'bg-red-500 border-red-700 text-white hover:bg-red-400 hover:scale-[1.02]') 
+                  : 'bg-slate-600 border-b-4 border-slate-800 text-slate-400 cursor-default transform scale-95') 
               : 'bg-[#FDCB2D] border-b-8 border-[#CA9208] text-[#78350F] hover:brightness-110 active:border-b-0 active:translate-y-2 active:shadow-none animate-pulse-glow'
             }
           `}
         >
-          <span className="relative z-10">{appState === AppState.FLIPPING ? 'FLIPPING...' : 'FLIP'}</span>
+          <span className="relative z-10">
+            {appState === AppState.FLIPPING 
+               ? (isAutoSpin ? (isStopping ? 'STOPPING...' : 'STOP SPIN') : 'FLIPPING...') 
+               : (cash <= 0 && !activeBet ? 'GET BONUS $100' : (isAutoSpin ? 'START SPIN' : 'FLIP COIN'))}
+          </span>
           {appState !== AppState.FLIPPING && <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shine skew-x-12 pointer-events-none"></div>}
         </button>
 
-        <div className="flex gap-3 h-12 items-center">
-          {history.map((side, idx) => (
-            <div key={idx} className="flex flex-col items-center gap-1">
-               <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-black shadow-md ${side === CoinSide.HEADS ? 'bg-[#2E72F6] border-[#1A4BA0] text-white' : 'bg-[#E63636] border-[#9E1A1A] text-white'}`}>
-                  {side === CoinSide.HEADS ? 'H' : 'T'}
+        <div className="flex gap-2 h-10 items-center justify-center w-full overflow-hidden">
+          {history.length > 0 ? history.map((side, idx) => (
+            <div key={idx} className="flex flex-col items-center gap-1 animate-pop-in" style={{animationDelay: `${idx * 0.05}s`}}>
+               <div className={`
+                 w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 flex items-center justify-center text-xs font-black shadow-md 
+                 ${side === CoinSide.HEADS ? 'bg-[#FFD700] border-[#B8860B] text-[#78350F]' : 
+                   side === CoinSide.TAILS ? 'bg-[#E0E0E0] border-[#9E9E9E] text-[#424242]' : 
+                   'bg-[#00FFFF] border-white text-black shadow-[0_0_10px_cyan]'}
+               `}>
+                  {side === CoinSide.HEADS ? 'H' : (side === CoinSide.TAILS ? 'T' : 'E')}
                </div>
             </div>
-          ))}
-          {history.length === 0 && <div className="w-full text-white/30 text-xs uppercase font-bold tracking-widest">No History</div>}
+          )) : <div className="text-white/20 text-[10px] uppercase font-bold tracking-widest">Start Flipping</div>}
         </div>
       </div>
       
-      <style>{`
-        .game-btn-small {
-           @apply bg-blue-900/80 p-3 rounded-xl border-b-4 border-blue-800 hover:brightness-110 active:border-b-0 active:translate-y-1 transition-all text-white shadow-lg backdrop-blur-sm;
-        }
-        @keyframes pulseGlow {
-           0%, 100% { box-shadow: 0 6px 0px 0px rgba(0,0,0,0.4), 0 0 0 rgba(253, 203, 45, 0); }
-           50% { box-shadow: 0 6px 0px 0px rgba(0,0,0,0.4), 0 0 20px rgba(253, 203, 45, 0.6); }
-        }
-        .animate-pulse-glow {
-           animation: pulseGlow 2s infinite;
-        }
-      `}</style>
+      {isDebugMenuOpen && (
+         <div className="fixed top-20 right-4 bg-slate-900/95 text-white p-6 rounded-2xl text-xs z-[120] space-y-4 backdrop-blur-md border border-slate-700 shadow-2xl w-64 animate-slide-in-right">
+            <div className="flex justify-between items-center border-b border-slate-700 pb-2">
+                <div className="font-black text-lg text-purple-400 uppercase tracking-widest">Dev Tools</div>
+                <button onClick={() => setIsDebugMenuOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <div className="space-y-2">
+               <label className="flex items-center gap-3 p-2 bg-slate-800 rounded-lg cursor-pointer"><input type="checkbox" checked={forceHeads} onChange={e => { setForceHeads(e.target.checked); setForceTails(false); setForceEdge(false); }} className="accent-purple-500 scale-125" /> Force Heads</label>
+               <label className="flex items-center gap-3 p-2 bg-slate-800 rounded-lg cursor-pointer"><input type="checkbox" checked={forceTails} onChange={e => { setForceTails(e.target.checked); setForceHeads(false); setForceEdge(false); }} className="accent-purple-500 scale-125" /> Force Tails</label>
+               <label className="flex items-center gap-3 p-2 bg-slate-800 rounded-lg cursor-pointer ring-1 ring-cyan-500/50"><input type="checkbox" checked={forceEdge} onChange={e => { setForceEdge(e.target.checked); setForceHeads(false); setForceTails(false); }} className="accent-cyan-500 scale-125" /> Force Edge</label>
+            </div>
+            <button onClick={() => updateCash(1000000)} className="w-full py-2 bg-green-900/50 text-green-400 border border-green-900 rounded font-bold">+ $1M Cash</button>
+            <button onClick={() => { setStreak(0); setHighScore(0); setTotalFlips(0); setInventory([]); setActiveBet(null); setUnlockedAchievements(new Set()); setCash(100); localStorage.clear(); window.location.reload(); }} className="w-full py-2 bg-red-900/50 text-red-400 border border-red-900 rounded">Reset Data</button>
+         </div>
+      )}
     </div>
   );
 }
